@@ -16,7 +16,8 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       // Replaces process.env.API_KEY in the code with the actual value during build
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      // Checks both the loaded .env file (local dev) and system environment variables (GitHub Actions)
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY),
     },
     server: {
       headers: {
