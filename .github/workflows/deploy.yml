@@ -25,15 +25,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          # Usunięto cache: 'npm', ponieważ wymaga on pliku package-lock.json, którego jeszcze nie ma w repozytorium
 
       - name: Install dependencies
-        run: npm ci
+        # Używamy 'npm install' zamiast 'npm ci', aby wygenerować brakujący package-lock.json w locie
+        run: npm install
 
       - name: Build
         run: npm run build
         env:
-          # Inject the API key from GitHub Secrets into the build process
+          # Wstrzyknięcie klucza API z sekretów GitHub
           API_KEY: ${{ secrets.API_KEY }}
 
       - name: Upload artifact
