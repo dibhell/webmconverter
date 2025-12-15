@@ -1,6 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CaptionResult } from "../types";
 
+// Declare process to satisfy TypeScript. 
+// Vite replaces 'process.env.API_KEY' with the actual string during build via 'define'.
+declare const process: { env: { API_KEY?: string } };
+
 // Note: In a real production app, never expose keys on the client.
 // However, for this specific "all in one page on gh" request, we rely on the user providing it 
 // or the environment setup. The system instruction says to use process.env.API_KEY.
