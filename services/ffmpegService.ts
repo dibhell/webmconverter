@@ -80,7 +80,9 @@ class FFmpegService {
     await this.ffmpeg.deleteFile(inputName);
     await this.ffmpeg.deleteFile(outputName);
 
-    return new Blob([data], { type: 'video/mp4' });
+    // Cast to any to avoid TypeScript error: "Type 'FileData' is not assignable to type 'BlobPart'."
+    // This happens because Uint8Array types can slightly differ between libs (ArrayBufferLike vs ArrayBuffer).
+    return new Blob([data as any], { type: 'video/mp4' });
   }
 
   public isLoaded(): boolean {
