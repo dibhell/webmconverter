@@ -16,10 +16,20 @@ class FFmpegService {
 
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
     
-    // Load ffmpeg.wasm from a CDN
+    // Fix for "Failed to construct 'Worker'":
+    // The default behavior tries to spawn a worker from esm.sh which is blocked by CORS/security policies.
+    // We create a local blob acting as a proxy that imports the remote worker script.
+    const workerBlob = new Blob(
+      [`import "https://esm.sh/@ffmpeg/ffmpeg@0.12.15/es2022/worker.js";`], 
+      { type: 'application/javascript' }
+    );
+    const workerURL = URL.createObjectURL(workerBlob);
+
+    // Load ffmpeg.wasm with explicit workerURL
     await this.ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      workerURL: workerURL,
     });
 
     this.loaded = true;
