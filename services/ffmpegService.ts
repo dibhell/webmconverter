@@ -14,13 +14,18 @@ class FFmpegService {
       onLog(message);
     });
 
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+    // Use specific compatible versions
+    const coreVersion = '0.12.6'; 
+    const wrapperVersion = '0.12.15';
+    
+    const baseURL = `https://unpkg.com/@ffmpeg/core@${coreVersion}/dist/umd`;
     
     // Fix for "Failed to construct 'Worker'":
     // The default behavior tries to spawn a worker from esm.sh which is blocked by CORS/security policies.
     // We create a local blob acting as a proxy that imports the remote worker script.
+    // Explicitly import the worker version matching the installed package to avoid conflicts.
     const workerBlob = new Blob(
-      [`import "https://esm.sh/@ffmpeg/ffmpeg@0.12.15/es2022/worker.js";`], 
+      [`import "https://esm.sh/@ffmpeg/ffmpeg@${wrapperVersion}/es2022/worker.js";`], 
       { type: 'application/javascript' }
     );
     const workerURL = URL.createObjectURL(workerBlob);

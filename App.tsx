@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import React, { useEffect, useState, useRef } from 'react';
 import { ffmpegService } from './services/ffmpegService';
 import FileUploader from './components/FileUploader';

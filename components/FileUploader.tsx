@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import React, { useCallback } from 'react';
 import { Upload, FileVideo } from 'lucide-react';
 
@@ -16,7 +17,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, disabled })
         if (file.type.includes('webm') || file.name.endsWith('.webm')) {
           onFileSelected(file);
         } else {
-          alert('Proszę wybrać plik WebM.');
+          window.alert('Proszę wybrać plik WebM.');
         }
       }
     },

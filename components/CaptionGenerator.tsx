@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import React, { useState } from 'react';
 import { generateInstagramCaption } from '../services/geminiService';
 import { Sparkles, Copy, Check } from 'lucide-react';
@@ -34,7 +35,9 @@ const CaptionGenerator: React.FC<CaptionGeneratorProps> = ({ fileName }) => {
   const handleCopy = () => {
     if (result) {
       const fullText = `${result.caption}\n\n${result.hashtags.join(' ')}`;
-      navigator.clipboard.writeText(fullText);
+      if (window.navigator.clipboard) {
+        window.navigator.clipboard.writeText(fullText);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
