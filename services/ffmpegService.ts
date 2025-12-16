@@ -14,15 +14,14 @@ class FFmpegService {
     }
 
     try {
-      onLog("Pobieranie modułów FFmpeg (ESM)...");
+      onLog("Pobieranie modułów FFmpeg (ESM/esm.sh)...");
       
-      const BASE_URL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm';
-      const FFMPEG_URL = `${BASE_URL}/index.js`;
-      const UTIL_URL = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
-      
-      const { FFmpeg } = await import(/* @vite-ignore */ FFMPEG_URL);
-      const { toBlobURL, fetchFile } = await import(/* @vite-ignore */ UTIL_URL);
+      // We use esm.sh because it resolves internal dependencies (like @ffmpeg/util)
+      // to absolute URLs, preventing "bare import" errors in the browser.
+      const FFmpegImport = await import("https://esm.sh/@ffmpeg/ffmpeg@0.12.10");
+      const { toBlobURL, fetchFile } = await import("https://esm.sh/@ffmpeg/util@0.12.1");
 
+      const FFmpeg = FFmpegImport.FFmpeg;
       this.fetchFile = fetchFile;
 
       onLog("Inicjalizacja silnika...");
@@ -32,33 +31,26 @@ class FFmpegService {
         onLog(message);
       });
 
-      const CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+      const CORE_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
       
-      onLog("Przygotowanie workera...");
+      onLog("Konfigurowanie workera...");
 
-      // MANUAL WORKER PATCHING
-      // We fetch the worker script text and patch its imports to be absolute URLs.
-      // This is necessary because loading a Worker from a cross-origin URL (CDN) is blocked,
-      // and loading it from a Blob (local) breaks relative imports inside the worker script.
-      const workerResponse = await fetch(`${BASE_URL}/worker.js`);
-      let workerScript = await workerResponse.text();
-
-      // Replace relative imports (e.g. from "./classes.js") with absolute CDN URLs
-      workerScript = workerScript.replace(
-        /from\s*['"]\.\/(.*?)['"]/g, 
-        (match, file) => `from "${BASE_URL}/${file}"`
+      // WORKER STRATEGY:
+      // 1. Create a local Blob for the worker (satisfies "same-origin" policy for new Worker()).
+      // 2. Inside the Blob, import the worker logic from esm.sh (satisfies dependency resolution).
+      // 3. esm.sh handles the cross-origin imports correctly via CORS headers.
+      const workerBlob = new Blob(
+        [`import "https://esm.sh/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js";`],
+        { type: 'text/javascript' }
       );
-
-      const workerBlob = new Blob([workerScript], { type: 'text/javascript' });
-      const workerBlobURL = URL.createObjectURL(workerBlob);
+      const workerURL = URL.createObjectURL(workerBlob);
 
       onLog("Ładowanie rdzenia WebAssembly...");
 
-      // Load core scripts via Blob URLs to handle worker origin restrictions
       await this.ffmpeg.load({
-        coreURL: await toBlobURL(`${CORE_URL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${CORE_URL}/ffmpeg-core.wasm`, 'application/wasm'),
-        workerURL: workerBlobURL,
+        coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
+        workerURL: workerURL,
       });
 
       this.loaded = true;
