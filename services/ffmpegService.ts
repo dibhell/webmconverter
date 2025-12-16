@@ -1,9 +1,24 @@
+// Declare globals provided by the UMD scripts in index.html
+declare const FFmpeg: { FFmpeg: new () => any };
+declare const FFmpegUtil: { fetchFile: (file: File) => Promise<Uint8Array>, toBlobURL: (url: string, type: string) => Promise<string> };
+
 class FFmpegService {
   private ffmpeg: any = null;
   private loaded: boolean = false;
-  private FFmpegClass: any = null;
-  private fetchFile: any = null;
-  private toBlobURL: any = null;
+
+  private async waitForGlobals(): Promise<void> {
+    const maxRetries = 20;
+    let attempts = 0;
+
+    while (attempts < maxRetries) {
+      if (typeof FFmpeg !== 'undefined' && typeof FFmpegUtil !== 'undefined') {
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 200));
+      attempts++;
+    }
+    throw new Error('Timeout waiting for FFmpeg libraries to load.');
+  }
 
   public async load(onLog: (msg: string) => void): Promise<void> {
     if (this.loaded) return;
@@ -16,37 +31,33 @@ class FFmpegService {
     }
 
     try {
-      // Dynamic import using full URLs to bypass Vite's bundler and use browser native loading
-      // @ts-ignore
-      const ffmpegModule = await import('https://esm.sh/@ffmpeg/ffmpeg@0.12.10');
-      // @ts-ignore
-      const utilModule = await import('https://esm.sh/@ffmpeg/util@0.12.1');
+      onLog("Inicjalizacja bibliotek...");
+      await this.waitForGlobals();
 
-      this.FFmpegClass = ffmpegModule.FFmpeg;
-      this.fetchFile = utilModule.fetchFile;
-      this.toBlobURL = utilModule.toBlobURL;
+      // Access the class from the global object
+      const { FFmpeg: FFmpegClass } = FFmpeg;
+      const { toBlobURL } = FFmpegUtil;
 
-      this.ffmpeg = new this.FFmpegClass();
+      this.ffmpeg = new FFmpegClass();
 
       this.ffmpeg.on('log', ({ message }: { message: string }) => {
         onLog(message);
       });
 
-      // Use jsDelivr for core/wasm as it correctly sets Cross-Origin-Resource-Policy header
-      // which is required when COOP/COEP is active
+      // Use jsDelivr for core/wasm to ensure Cross-Origin-Resource-Policy header
       const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
       
-      onLog("Pobieranie bibliotek FFmpeg...");
+      onLog("Pobieranie silnika FFmpeg (WASM)...");
 
       await this.ffmpeg.load({
-        coreURL: await this.toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await this.toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
 
       this.loaded = true;
     } catch (error: any) {
       console.error("FFmpeg load error:", error);
-      throw new Error(`Nie udało się załadować FFmpeg: ${error.message}. Sprawdź konsolę.`);
+      throw new Error(`Nie udało się załadować FFmpeg: ${error.message}`);
     }
   }
 
@@ -58,16 +69,19 @@ class FFmpegService {
       throw new Error('FFmpeg not loaded');
     }
 
+    const { fetchFile } = FFmpegUtil;
+
     const inputName = 'input.webm';
     const outputName = 'output.mp4';
 
-    await this.ffmpeg.writeFile(inputName, await this.fetchFile(file));
+    await this.ffmpeg.writeFile(inputName, await fetchFile(file));
 
     this.ffmpeg.on('progress', ({ progress }: { progress: number }) => {
       onProgress(Math.round(progress * 100));
     });
 
     // Run conversion: WebM -> MP4 (H.264/AAC)
+    // Using ultrafast preset for speed in browser
     await this.ffmpeg.exec([
       '-i', inputName,
       '-c:v', 'libx264',
