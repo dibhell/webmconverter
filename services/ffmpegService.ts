@@ -1,37 +1,40 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
+// We use the global FFmpeg/FFmpegUtil loaded in index.html to bypass Vite's worker bundling 
+// which often fails with COOP/COEP or 404s in this specific environment.
+declare const FFmpeg: any;
+declare const FFmpegUtil: any;
 
 class FFmpegService {
-  private ffmpeg: FFmpeg | null = null;
+  private ffmpeg: any = null;
   private loaded: boolean = false;
 
   public async load(onLog: (msg: string) => void): Promise<void> {
     if (this.loaded) return;
 
-    // Check for SharedArrayBuffer support (required for ffmpeg-core)
+    if (typeof FFmpeg === 'undefined' || typeof FFmpegUtil === 'undefined') {
+      throw new Error("Biblioteki FFmpeg nie zostały załadowane (błąd skryptu UMD).");
+    }
+
     if (!window.crossOriginIsolated) {
       throw new Error(
         'Brak izolacji origin (Cross-Origin Isolated). ' +
-        'Odśwież stronę. Jeśli problem nadal występuje, przeglądarka może nie wspierać tej funkcji.'
+        'Odśwież stronę. Wymagane nagłówki COOP/COEP.'
       );
     }
 
-    this.ffmpeg = new FFmpeg();
+    // Create instance from global UMD
+    this.ffmpeg = new FFmpeg.FFmpeg();
 
-    this.ffmpeg.on('log', ({ message }) => {
+    this.ffmpeg.on('log', ({ message }: { message: string }) => {
       onLog(message);
     });
 
-    // Use specific compatible versions from unpkg (ESM build works best with Blobs)
-    const coreVersion = '0.12.6'; 
-    const baseURL = `https://unpkg.com/@ffmpeg/core@${coreVersion}/dist/esm`;
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
 
     try {
+      // Manually load the core to ensure we use the remote version compatible with our headers
       await this.ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        // In 0.12.x ESM builds, we typically don't need a separate workerURL 
-        // if we provide the coreURL as a blob, the library handles it.
+        coreURL: await FFmpegUtil.toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await FFmpegUtil.toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
 
       this.loaded = true;
@@ -52,18 +55,13 @@ class FFmpegService {
     const inputName = 'input.webm';
     const outputName = 'output.mp4';
 
-    // Write file to virtual FS
-    await this.ffmpeg.writeFile(inputName, await fetchFile(file));
+    await this.ffmpeg.writeFile(inputName, await FFmpegUtil.fetchFile(file));
 
-    // FFmpeg progress monitoring
-    this.ffmpeg.on('progress', ({ progress }) => {
+    this.ffmpeg.on('progress', ({ progress }: { progress: number }) => {
       onProgress(Math.round(progress * 100));
     });
 
-    // Run conversion command
-    // Instagram recommended: H.264 video, AAC audio, MP4 container
-    // Preset ultrafast for browser speed
-    // pix_fmt yuv420p is required for broad compatibility
+    // Run conversion
     await this.ffmpeg.exec([
       '-i', inputName,
       '-c:v', 'libx264',
@@ -76,25 +74,17 @@ class FFmpegService {
       outputName
     ]);
 
-    // Read result
     const data = await this.ffmpeg.readFile(outputName);
     
-    // Cleanup
     await this.ffmpeg.deleteFile(inputName);
     await this.ffmpeg.deleteFile(outputName);
 
-    // Cast to any to avoid TypeScript error with BlobPart
-    return new Blob([data as any], { type: 'video/mp4' });
+    return new Blob([data.buffer], { type: 'video/mp4' });
   }
 
   public isLoaded(): boolean {
     return this.loaded;
   }
 }
-
-// Helper to fetch file data
-const fetchFile = async (file: File): Promise<Uint8Array> => {
-  return new Uint8Array(await file.arrayBuffer());
-};
 
 export const ffmpegService = new FFmpegService();
