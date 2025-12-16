@@ -7,7 +7,7 @@ class FFmpegService {
    */
   private loadScript(src: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Check if already exists
+      // Check if already exists to prevent double loading
       if (document.querySelector(`script[src="${src}"]`)) {
         resolve();
         return;
@@ -35,27 +35,54 @@ class FFmpegService {
       );
     }
 
+    // HACK: Temporarily hide 'exports', 'module', and 'define' to prevent UMD scripts
+    // from detecting a CommonJS/AMD environment (often injected by browser extensions).
+    // This forces the UMD script to attach to 'window'.
+    const stash: Record<string, any> = {};
+    const conflictKeys = ['exports', 'module', 'define'];
+    
+    conflictKeys.forEach(key => {
+      // @ts-ignore
+      if (typeof window[key] !== 'undefined') {
+        // @ts-ignore
+        stash[key] = window[key];
+        // @ts-ignore
+        window[key] = undefined;
+      }
+    });
+
     try {
       onLog("Pobieranie bibliotek (UMD)...");
       
-      // Load FFmpeg UMD scripts sequentially to ensure dependencies
-      // Using specific versions from jsDelivr which supports CORP
+      // Load FFmpeg UMD scripts sequentially
+      // Using jsDelivr as it supports Cross-Origin-Resource-Policy needed for SharedArrayBuffer
       await this.loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js');
       await this.loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.min.js');
 
-      // Access globals safely
-      // @ts-ignore
-      const FFmpegGlobal = window.FFmpeg;
-      // @ts-ignore
-      const FFmpegUtilGlobal = window.FFmpegUtil;
+      // Retry loop to wait for globals to appear (in case of slight async execution delays)
+      let FFmpegGlobal = null;
+      let FFmpegUtilGlobal = null;
+      
+      for (let i = 0; i < 20; i++) {
+        // @ts-ignore
+        FFmpegGlobal = window.FFmpeg;
+        // @ts-ignore
+        FFmpegUtilGlobal = window.FFmpegUtil;
+        
+        if (FFmpegGlobal && FFmpegUtilGlobal) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
 
       if (!FFmpegGlobal || !FFmpegUtilGlobal) {
-        throw new Error("Biblioteki pobrane, ale obiekty globalne (FFmpeg/FFmpegUtil) nie istnieją.");
+        // Debugging info
+        const keys = Object.keys(window).filter(k => k.toLowerCase().includes('ffmpeg'));
+        console.error("Dostępne klucze w window zawierające 'ffmpeg':", keys);
+        throw new Error("Biblioteki pobrane, ale obiekty globalne (FFmpeg/FFmpegUtil) nie istnieją. Sprawdź konsolę pod kątem konfliktów.");
       }
 
       onLog("Inicjalizacja silnika...");
 
-      // Handle UMD export variations (sometimes it's .FFmpeg, sometimes it's the object itself)
+      // Handle UMD export variations
       const FFmpegClass = FFmpegGlobal.FFmpeg || FFmpegGlobal;
       const { toBlobURL, fetchFile } = FFmpegUtilGlobal;
 
@@ -79,6 +106,14 @@ class FFmpegService {
     } catch (error: any) {
       console.error("FFmpeg load error:", error);
       throw new Error(`Błąd inicjalizacji FFmpeg: ${error.message}`);
+    } finally {
+      // Restore the stashed globals
+      conflictKeys.forEach(key => {
+        if (stash[key] !== undefined) {
+          // @ts-ignore
+          window[key] = stash[key];
+        }
+      });
     }
   }
 
