@@ -1,18 +1,12 @@
-// We use the global FFmpeg/FFmpegUtil loaded in index.html to bypass Vite's worker bundling 
-// which often fails with COOP/COEP or 404s in this specific environment.
-declare const FFmpeg: any;
-declare const FFmpegUtil: any;
-
 class FFmpegService {
   private ffmpeg: any = null;
   private loaded: boolean = false;
+  private FFmpegClass: any = null;
+  private fetchFile: any = null;
+  private toBlobURL: any = null;
 
   public async load(onLog: (msg: string) => void): Promise<void> {
     if (this.loaded) return;
-
-    if (typeof FFmpeg === 'undefined' || typeof FFmpegUtil === 'undefined') {
-      throw new Error("Biblioteki FFmpeg nie zostały załadowane (błąd skryptu UMD).");
-    }
 
     if (!window.crossOriginIsolated) {
       throw new Error(
@@ -21,26 +15,38 @@ class FFmpegService {
       );
     }
 
-    // Create instance from global UMD
-    this.ffmpeg = new FFmpeg.FFmpeg();
-
-    this.ffmpeg.on('log', ({ message }: { message: string }) => {
-      onLog(message);
-    });
-
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-
     try {
-      // Manually load the core to ensure we use the remote version compatible with our headers
+      // Dynamic import using full URLs to bypass Vite's bundler and use browser native loading
+      // @ts-ignore
+      const ffmpegModule = await import('https://esm.sh/@ffmpeg/ffmpeg@0.12.10');
+      // @ts-ignore
+      const utilModule = await import('https://esm.sh/@ffmpeg/util@0.12.1');
+
+      this.FFmpegClass = ffmpegModule.FFmpeg;
+      this.fetchFile = utilModule.fetchFile;
+      this.toBlobURL = utilModule.toBlobURL;
+
+      this.ffmpeg = new this.FFmpegClass();
+
+      this.ffmpeg.on('log', ({ message }: { message: string }) => {
+        onLog(message);
+      });
+
+      // Use jsDelivr for core/wasm as it correctly sets Cross-Origin-Resource-Policy header
+      // which is required when COOP/COEP is active
+      const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+      
+      onLog("Pobieranie bibliotek FFmpeg...");
+
       await this.ffmpeg.load({
-        coreURL: await FFmpegUtil.toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await FFmpegUtil.toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        coreURL: await this.toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await this.toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
       });
 
       this.loaded = true;
     } catch (error: any) {
       console.error("FFmpeg load error:", error);
-      throw new Error(`Nie udało się załadować FFmpeg: ${error.message}`);
+      throw new Error(`Nie udało się załadować FFmpeg: ${error.message}. Sprawdź konsolę.`);
     }
   }
 
@@ -55,13 +61,13 @@ class FFmpegService {
     const inputName = 'input.webm';
     const outputName = 'output.mp4';
 
-    await this.ffmpeg.writeFile(inputName, await FFmpegUtil.fetchFile(file));
+    await this.ffmpeg.writeFile(inputName, await this.fetchFile(file));
 
     this.ffmpeg.on('progress', ({ progress }: { progress: number }) => {
       onProgress(Math.round(progress * 100));
     });
 
-    // Run conversion
+    // Run conversion: WebM -> MP4 (H.264/AAC)
     await this.ffmpeg.exec([
       '-i', inputName,
       '-c:v', 'libx264',
@@ -69,7 +75,7 @@ class FFmpegService {
       '-crf', '23',
       '-c:a', 'aac',
       '-b:a', '128k',
-      '-pix_fmt', 'yuv420p', 
+      '-pix_fmt', 'yuv420p',
       '-movflags', '+faststart',
       outputName
     ]);
