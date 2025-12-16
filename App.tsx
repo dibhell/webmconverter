@@ -16,22 +16,49 @@ const App: React.FC = () => {
 
   // Effect to load FFmpeg on mount
   useEffect(() => {
+    let mounted = true;
     const load = async () => {
       setStatus(ConversionStatus.LOADING_FFMPEG);
+      
+      // Safety timeout: if FFmpeg doesn't load in 20 seconds, show error
+      const timeoutId = setTimeout(() => {
+        if (mounted && status === ConversionStatus.LOADING_FFMPEG) {
+          setStatus(ConversionStatus.ERROR);
+          setLogs(prev => prev + '\nBłąd: Przekroczono limit czasu ładowania. Sprawdź połączenie z internetem.');
+        }
+      }, 20000);
+
       try {
         await ffmpegService.load((msg) => {
-           // Limit log buffer size
-           setLogs(prev => (prev + '\n' + msg).slice(-500));
+           if (mounted) setLogs(prev => (prev + '\n' + msg).slice(-500));
         });
-        setStatus(ConversionStatus.READY);
-        setLogs('System gotowy. Prześlij plik WebM.');
+        if (mounted) {
+          setStatus(ConversionStatus.READY);
+          setLogs('System gotowy. Prześlij plik WebM.');
+          clearTimeout(timeoutId);
+        }
       } catch (e: any) {
-        console.error(e);
-        setStatus(ConversionStatus.ERROR);
-        setLogs(`Błąd ładowania FFmpeg: ${e.message}. Upewnij się, że używasz nowoczesnej przeglądarki.`);
+        if (mounted) {
+          console.error(e);
+          setStatus(ConversionStatus.ERROR);
+          setLogs(`Błąd ładowania FFmpeg: ${e.message}`);
+          clearTimeout(timeoutId);
+        }
       }
     };
+    
+    // Check if service worker has enabled COOP/COEP
+    if (!window.crossOriginIsolated) {
+        console.warn("Strona nie jest w trybie Cross-Origin Isolated. Próba przeładowania przez Service Worker...");
+        // The service worker in index.html should handle the reload, but we show a log just in case
+        setLogs('Konfiguracja środowiska bezpiecznego (Service Worker)...');
+    }
+
     load();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleFileSelected = (file: File) => {
@@ -129,7 +156,7 @@ const App: React.FC = () => {
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center max-w-2xl mx-auto mb-8">
             <AlertCircle className="mx-auto text-red-400 mb-2" size={32} />
             <h3 className="text-lg font-semibold text-red-200 mb-2">Wystąpił błąd</h3>
-            <p className="text-red-300/80 text-sm">{logs}</p>
+            <p className="text-red-300/80 text-sm whitespace-pre-wrap">{logs}</p>
             <button 
               onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-sm transition-colors"
