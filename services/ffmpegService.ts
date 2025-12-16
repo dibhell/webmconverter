@@ -16,11 +16,8 @@ class FFmpegService {
     try {
       onLog("Pobieranie modułów FFmpeg (ESM)...");
       
-      // Use dynamic imports from a reliable CDN (unpkg) to load ESM modules directly.
-      // This bypasses UMD global variable conflicts ('FFmpeg' vs 'FFmpegWASM') and
-      // avoids Vite bundling issues with workers.
-      // We use variables for URLs to prevent Vite from trying to resolve them at build time.
-      const FFMPEG_URL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+      const BASE_URL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm';
+      const FFMPEG_URL = `${BASE_URL}/index.js`;
       const UTIL_URL = 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
       
       const { FFmpeg } = await import(/* @vite-ignore */ FFMPEG_URL);
@@ -37,12 +34,31 @@ class FFmpegService {
 
       const CORE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
       
+      onLog("Przygotowanie workera...");
+
+      // MANUAL WORKER PATCHING
+      // We fetch the worker script text and patch its imports to be absolute URLs.
+      // This is necessary because loading a Worker from a cross-origin URL (CDN) is blocked,
+      // and loading it from a Blob (local) breaks relative imports inside the worker script.
+      const workerResponse = await fetch(`${BASE_URL}/worker.js`);
+      let workerScript = await workerResponse.text();
+
+      // Replace relative imports (e.g. from "./classes.js") with absolute CDN URLs
+      workerScript = workerScript.replace(
+        /from\s*['"]\.\/(.*?)['"]/g, 
+        (match, file) => `from "${BASE_URL}/${file}"`
+      );
+
+      const workerBlob = new Blob([workerScript], { type: 'text/javascript' });
+      const workerBlobURL = URL.createObjectURL(workerBlob);
+
       onLog("Ładowanie rdzenia WebAssembly...");
 
       // Load core scripts via Blob URLs to handle worker origin restrictions
       await this.ffmpeg.load({
         coreURL: await toBlobURL(`${CORE_URL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${CORE_URL}/ffmpeg-core.wasm`, 'application/wasm'),
+        workerURL: workerBlobURL,
       });
 
       this.loaded = true;
