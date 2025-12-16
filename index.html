@@ -4,8 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InstaConvert AI - WebM to MP4</title>
-    <!-- COI Service Worker MUST be loaded from the same origin (local file) and BEFORE app scripts -->
+    
+    <!-- COI Service Worker to enable SharedArrayBuffer -->
     <script src="coi-serviceworker.js"></script>
+    
+    <!-- Fail-safe reload if SW didn't kick in immediately -->
+    <script>
+      if (!window.crossOriginIsolated && window.isSecureContext) {
+        // Give the service worker a moment to register, then check
+        setTimeout(() => {
+           if (!window.crossOriginIsolated) {
+             console.log("Page not isolated, attempting reload...");
+             // Only reload if we haven't just reloaded (simple check)
+             if (!sessionStorage.getItem('coi_reloaded')) {
+                sessionStorage.setItem('coi_reloaded', 'true');
+                window.location.reload();
+             } else {
+                sessionStorage.removeItem('coi_reloaded');
+             }
+           }
+        }, 3000);
+      }
+    </script>
+
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     </style>

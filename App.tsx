@@ -5,7 +5,7 @@ import FileUploader from './components/FileUploader';
 import VideoPreview from './components/VideoPreview';
 import CaptionGenerator from './components/CaptionGenerator';
 import { VideoFile, ConversionStatus } from './types';
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Instagram, Sparkles } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, CheckCircle2, Instagram, Sparkles, ShieldAlert } from 'lucide-react';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<ConversionStatus>(ConversionStatus.IDLE);
@@ -13,20 +13,33 @@ const App: React.FC = () => {
   const [outputVideoUrl, setOutputVideoUrl] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string>('Oczekiwanie na inicjalizację...');
+  const [isSecure, setIsSecure] = useState(true);
 
   // Effect to load FFmpeg on mount
   useEffect(() => {
+    // Check for Secure Context (HTTPS or localhost)
+    if (!window.isSecureContext) {
+      setIsSecure(false);
+      setStatus(ConversionStatus.ERROR);
+      setLogs('BŁĄD KRYTYCZNY: Aplikacja wymaga bezpiecznego połączenia (HTTPS) lub localhost do działania. Otwórz stronę przez https:// lub na localhost.');
+      return;
+    }
+
     let mounted = true;
+
     const load = async () => {
       setStatus(ConversionStatus.LOADING_FFMPEG);
       
-      // Safety timeout: if FFmpeg doesn't load in 20 seconds, show error
+      // Safety timeout
       const timeoutId = setTimeout(() => {
         if (mounted && status === ConversionStatus.LOADING_FFMPEG) {
+          // Check isolation specifically
+          if (!window.crossOriginIsolated) {
+             setLogs(prev => prev + '\n\nProblem z nagłówkami bezpieczeństwa. Spróbuj odświeżyć stronę.');
+          }
           setStatus(ConversionStatus.ERROR);
-          setLogs(prev => prev + '\nBłąd: Przekroczono limit czasu ładowania. Sprawdź połączenie z internetem.');
         }
-      }, 20000);
+      }, 10000); // Reduced to 10s for faster feedback
 
       try {
         await ffmpegService.load((msg) => {
@@ -49,9 +62,8 @@ const App: React.FC = () => {
     
     // Check if service worker has enabled COOP/COEP
     if (!window.crossOriginIsolated) {
-        console.warn("Strona nie jest w trybie Cross-Origin Isolated. Próba przeładowania przez Service Worker...");
-        // The service worker in index.html should handle the reload, but we show a log just in case
-        setLogs('Konfiguracja środowiska bezpiecznego (Service Worker)...');
+        console.warn("Strona nie jest w trybie Cross-Origin Isolated.");
+        setLogs('Konfiguracja trybu wysokiej wydajności (wymagane przeładowanie)...');
     }
 
     load();
@@ -144,25 +156,55 @@ const App: React.FC = () => {
           </p>
         </div>
 
-        {status === ConversionStatus.LOADING_FFMPEG && (
-          <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-indigo-400 font-medium">Ładowanie silnika konwersji...</p>
-            <p className="text-slate-500 text-sm mt-2">To może chwilę potrwać przy pierwszym uruchomieniu.</p>
+        {!isSecure && (
+           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center max-w-2xl mx-auto mb-8 animate-pulse">
+            <ShieldAlert className="mx-auto text-red-400 mb-2" size={48} />
+            <h3 className="text-xl font-bold text-red-200 mb-2">Połączenie niezabezpieczone</h3>
+            <p className="text-red-300">
+              Ta aplikacja wymaga <strong>SharedArrayBuffer</strong>, który działa tylko w bezpiecznym kontekście (HTTPS lub localhost).
+            </p>
+            <p className="text-red-300/70 text-sm mt-2">
+              Jeśli otwierasz stronę po IP w sieci lokalnej, to nie zadziała. Użyj <code>localhost</code> lub wdróż aplikację na serwer z HTTPS (np. GitHub Pages).
+            </p>
           </div>
         )}
 
-        {status === ConversionStatus.ERROR && (
+        {status === ConversionStatus.LOADING_FFMPEG && isSecure && (
+          <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-indigo-400 font-medium">Ładowanie silnika konwersji...</p>
+            {!window.crossOriginIsolated && (
+               <p className="text-yellow-500/80 text-xs mt-2 font-mono bg-yellow-900/20 px-2 py-1 rounded">
+                 Oczekiwanie na izolację wątków (Service Worker)...
+               </p>
+            )}
+            <p className="text-slate-500 text-sm mt-2 max-w-md text-center">
+              Pobieranie bibliotek FFmpeg (ok. 25MB). Może to chwilę potrwać za pierwszym razem.
+            </p>
+          </div>
+        )}
+
+        {status === ConversionStatus.ERROR && isSecure && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 text-center max-w-2xl mx-auto mb-8">
             <AlertCircle className="mx-auto text-red-400 mb-2" size={32} />
             <h3 className="text-lg font-semibold text-red-200 mb-2">Wystąpił błąd</h3>
-            <p className="text-red-300/80 text-sm whitespace-pre-wrap">{logs}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-sm transition-colors"
-            >
-              Odśwież stronę
-            </button>
+            <p className="text-red-300/80 text-sm whitespace-pre-wrap mb-4">{logs}</p>
+            
+            <div className="flex gap-4 justify-center">
+                <button 
+                onClick={() => window.location.reload()}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+                >
+                <RefreshCw size={16} />
+                Spróbuj ponownie
+                </button>
+            </div>
+            
+            {!window.crossOriginIsolated && (
+                 <p className="text-xs text-slate-500 mt-4">
+                     Wskazówka: Jeśli widzisz ten błąd lokalnie, upewnij się, że używasz komendy <code>npm run dev</code> lub serwujesz wersję zbudowaną z odpowiednimi nagłówkami COOP/COEP.
+                 </p>
+            )}
           </div>
         )}
 
