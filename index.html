@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InstaConvert AI - WebM to MP4</title>
+    <link rel="icon" href="data:,">
     
     <!-- COI Service Worker to enable SharedArrayBuffer -->
     <script src="coi-serviceworker.js"></script>
@@ -11,38 +12,35 @@
     <!-- Fail-safe reload if SW didn't kick in immediately -->
     <script>
       if (!window.crossOriginIsolated && window.isSecureContext) {
-        // Give the service worker a moment to register, then check
         setTimeout(() => {
            if (!window.crossOriginIsolated) {
-             console.log("Page not isolated, attempting reload...");
-             // Only reload if we haven't just reloaded (simple check)
              if (!sessionStorage.getItem('coi_reloaded')) {
                 sessionStorage.setItem('coi_reloaded', 'true');
                 window.location.reload();
-             } else {
-                sessionStorage.removeItem('coi_reloaded');
              }
            }
         }, 3000);
       }
     </script>
 
+    <!-- Load FFmpeg & Util via UMD to avoid Vite worker bundling issues -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "dom": "https://esm.sh/dom@^0.0.3",
     "react/": "https://esm.sh/react@^19.2.3/",
-    "@ffmpeg/ffmpeg": "https://esm.sh/@ffmpeg/ffmpeg@^0.12.15",
-    "@ffmpeg/util": "https://esm.sh/@ffmpeg/util@^0.12.2",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "react": "https://esm.sh/react@^19.2.3",
     "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "dom": "https://esm.sh/dom@^0.0.3"
   }
 }
 </script>
