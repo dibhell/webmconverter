@@ -8,36 +8,37 @@ class FFmpegService {
   public async load(onLog: (msg: string) => void): Promise<void> {
     if (this.loaded) return;
 
+    // Check for SharedArrayBuffer support (required for ffmpeg-core)
+    if (!window.crossOriginIsolated) {
+      throw new Error(
+        'Brak izolacji origin (Cross-Origin Isolated). ' +
+        'Odśwież stronę. Jeśli problem nadal występuje, przeglądarka może nie wspierać tej funkcji.'
+      );
+    }
+
     this.ffmpeg = new FFmpeg();
 
     this.ffmpeg.on('log', ({ message }) => {
       onLog(message);
     });
 
-    // Use specific compatible versions
+    // Use specific compatible versions from unpkg (ESM build works best with Blobs)
     const coreVersion = '0.12.6'; 
-    const wrapperVersion = '0.12.15';
-    
-    const baseURL = `https://unpkg.com/@ffmpeg/core@${coreVersion}/dist/umd`;
-    
-    // Fix for "Failed to construct 'Worker'":
-    // The default behavior tries to spawn a worker from esm.sh which is blocked by CORS/security policies.
-    // We create a local blob acting as a proxy that imports the remote worker script.
-    // Explicitly import the worker version matching the installed package to avoid conflicts.
-    const workerBlob = new Blob(
-      [`import "https://esm.sh/@ffmpeg/ffmpeg@${wrapperVersion}/es2022/worker.js";`], 
-      { type: 'application/javascript' }
-    );
-    const workerURL = URL.createObjectURL(workerBlob);
+    const baseURL = `https://unpkg.com/@ffmpeg/core@${coreVersion}/dist/esm`;
 
-    // Load ffmpeg.wasm with explicit workerURL
-    await this.ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-      workerURL: workerURL,
-    });
+    try {
+      await this.ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        // In 0.12.x ESM builds, we typically don't need a separate workerURL 
+        // if we provide the coreURL as a blob, the library handles it.
+      });
 
-    this.loaded = true;
+      this.loaded = true;
+    } catch (error: any) {
+      console.error("FFmpeg load error:", error);
+      throw new Error(`Nie udało się załadować FFmpeg: ${error.message}`);
+    }
   }
 
   public async convertWebMToMp4(
@@ -60,8 +61,9 @@ class FFmpegService {
     });
 
     // Run conversion command
-    // Instagram recommended: H.264 video, AAC audio
-    // Preset ultrafast for browser speed, crf 23 for decent quality
+    // Instagram recommended: H.264 video, AAC audio, MP4 container
+    // Preset ultrafast for browser speed
+    // pix_fmt yuv420p is required for broad compatibility
     await this.ffmpeg.exec([
       '-i', inputName,
       '-c:v', 'libx264',
@@ -69,7 +71,8 @@ class FFmpegService {
       '-crf', '23',
       '-c:a', 'aac',
       '-b:a', '128k',
-      '-movflags', '+faststart', // Important for web playback
+      '-pix_fmt', 'yuv420p', 
+      '-movflags', '+faststart',
       outputName
     ]);
 
@@ -80,8 +83,7 @@ class FFmpegService {
     await this.ffmpeg.deleteFile(inputName);
     await this.ffmpeg.deleteFile(outputName);
 
-    // Cast to any to avoid TypeScript error: "Type 'FileData' is not assignable to type 'BlobPart'."
-    // This happens because Uint8Array types can slightly differ between libs (ArrayBufferLike vs ArrayBuffer).
+    // Cast to any to avoid TypeScript error with BlobPart
     return new Blob([data as any], { type: 'video/mp4' });
   }
 
