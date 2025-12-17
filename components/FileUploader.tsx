@@ -54,10 +54,10 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFilesSelected, disabled, 
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       className={`
-        border-2 border-dashed rounded-2xl text-center transition-all duration-300 shadow-[0_12px_30px_rgba(0,0,0,0.25)]
+        group border border-dashed rounded-2xl text-center transition-all duration-300 shadow-[0_18px_35px_rgba(0,0,0,0.25)]
         flex flex-col items-center justify-center gap-4 cursor-pointer
-        ${isCompact ? 'p-4 sm:p-6' : 'p-10'}
-        ${disabled ? 'opacity-60 cursor-not-allowed border-icy-slate/40 bg-frozen-spruce/40' : 'border-icy-slate/50 hover:border-frost/40 hover:bg-cold-shadow-blue/50 bg-cold-shadow-blue/25'}
+        ${isCompact ? 'p-5 sm:p-6' : 'p-10'}
+        ${disabled ? 'opacity-60 cursor-not-allowed border-icy-slate/30 bg-frozen-spruce/30' : 'border-icy-slate/40 hover:border-frost/40 bg-frozen-spruce/40 hover:bg-frozen-spruce/60'}
       `}
       onClick={() => !disabled && document.getElementById('fileInput')?.click()}
     >
@@ -70,7 +70,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFilesSelected, disabled, 
         onChange={handleInputChange}
         disabled={disabled}
       />
-      <div className={`${isCompact ? 'w-10 h-10' : 'w-16 h-16'} bg-deep-forest-teal/40 rounded-full flex items-center justify-center text-frost`}>
+      <div className={`${isCompact ? 'w-10 h-10' : 'w-14 h-14'} bg-deep-forest-teal/35 rounded-full flex items-center justify-center text-frost shadow-[0_0_0_1px_rgba(92,111,120,0.5)]`}>
         {disabled ? <FileVideo size={isCompact ? 20 : 32} /> : <Upload size={isCompact ? 20 : 32} />}
       </div>
       <div>

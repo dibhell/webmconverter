@@ -3,9 +3,8 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { ffmpegService } from './services/ffmpegService';
 import FileUploader from './components/FileUploader';
 import VideoPreview from './components/VideoPreview';
-import CaptionGenerator from './components/CaptionGenerator';
 import { VideoFile, ConversionStatus, FileConversionStatus, VideoQualityPreset } from './types';
-import { Download, RefreshCw, AlertCircle, Sparkles, ShieldAlert, Instagram, Trash2, ListChecks } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, ShieldAlert, Instagram, Trash2, ListChecks } from 'lucide-react';
 
 type VideoItem = VideoFile & {
   id: string;
@@ -141,28 +140,36 @@ const App: React.FC = () => {
   }, []);
 
   const loadDurationForFile = useCallback(
-    (id: string, url: string) => {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
+    (id: string, url: string) =>
+      new Promise<number | undefined>((resolve) => {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
 
-      const cleanup = () => {
-        video.onloadedmetadata = null;
-        video.onerror = null;
-        video.removeAttribute('src');
-        video.load();
-      };
+        const cleanup = () => {
+          video.onloadedmetadata = null;
+          video.onerror = null;
+          video.removeAttribute('src');
+          video.load();
+        };
 
-      video.onloadedmetadata = () => {
-        const duration = video.duration;
-        if (Number.isFinite(duration) && duration > 0) {
-          updateFile(id, { durationSeconds: duration });
-        }
-        cleanup();
-      };
+        video.onloadedmetadata = () => {
+          const duration = video.duration;
+          if (Number.isFinite(duration) && duration > 0) {
+            updateFile(id, { durationSeconds: duration });
+            resolve(duration);
+          } else {
+            resolve(undefined);
+          }
+          cleanup();
+        };
 
-      video.onerror = cleanup;
-      video.src = url;
-    },
+        video.onerror = () => {
+          cleanup();
+          resolve(undefined);
+        };
+
+        video.src = url;
+      }),
     [updateFile]
   );
 
@@ -198,7 +205,9 @@ const App: React.FC = () => {
 
       setVideoFiles((prev) => [...prev, ...newItems]);
       setActiveFileId((prev) => prev ?? newItems[0].id);
-      newItems.forEach((item) => loadDurationForFile(item.id, item.url));
+      newItems.forEach((item) => {
+        void loadDurationForFile(item.id, item.url);
+      });
       setLogs(`Dodano ${newItems.length} plikow.`);
     },
     [loadDurationForFile]
@@ -225,10 +234,11 @@ const App: React.FC = () => {
       setLogs(`Konwersja: ${target.name}`);
 
       try {
+        const resolvedDuration = target.durationSeconds ?? (await loadDurationForFile(target.id, target.url));
         const mp4Blob = await ffmpegService.convertWebMToMp4(
           target.file,
           (prog) => updateFile(fileId, { progress: clampProgress(prog) }),
-          target.durationSeconds,
+          resolvedDuration,
           preset
         );
 
@@ -366,16 +376,16 @@ const App: React.FC = () => {
       <main className="max-w-6xl mx-auto px-6 py-14">
         
         {/* Intro */}
-        <div className="text-center mb-12 animate-fade-in">
-          <div className="inline-flex items-center gap-2 rounded-full border border-icy-slate/40 bg-cold-shadow-blue/40 px-4 py-1 text-[11px] uppercase tracking-[0.2em] text-steel-winter">
+        <div className="text-center mb-10 animate-fade-in">
+          <p className="text-[11px] uppercase tracking-[0.35em] text-steel-winter">
             Local-only pipeline
-          </div>
-          <h2 className="mt-5 text-3xl md:text-4xl font-display font-semibold text-frost mb-4">
+          </p>
+          <h2 className="mt-4 text-3xl md:text-4xl font-display font-semibold text-frost mb-3">
             Przygotuj wideo na Instagram
           </h2>
           <p className="text-steel-winter max-w-2xl mx-auto text-sm md:text-base">
-            Konwertuj pliki WebM do formatu MP4 obsługiwanego przez Instagram bez utraty jakości. 
-            Całość działa lokalnie w Twojej przeglądarce, zapewniając prywatność.
+            Konwertuj pliki WebM do formatu MP4 obslugiwanego przez Instagram bez utraty jakosci.
+            Calosc dziala lokalnie w Twojej przegladarce, zapewniajac prywatnosc.
           </p>
         </div>
 
@@ -433,12 +443,10 @@ const App: React.FC = () => {
 
         {isReady && (
           <div
-            className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in"
+            className="grid grid-cols-1 gap-8 animate-fade-in"
             style={{ animationDelay: '120ms' }}
           >
-            
-            {/* Left Column: Input/Output */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="space-y-6">
               <FileUploader
                 onFilesSelected={handleFilesSelected}
                 disabled={!isReady || isProcessing}
@@ -446,21 +454,22 @@ const App: React.FC = () => {
               />
 
               {hasFiles && activeFile && (
-                <div className="space-y-6 animate-fade-in">
-                  {/* Video Previews */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-6 animate-fade-in">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <VideoPreview url={activeFile.url} label="Oryginal (WebM)" onDuration={handleInputDuration} />
                     {activeFile.outputUrl ? (
                       <VideoPreview url={activeFile.outputUrl} label="Wynik (MP4)" />
                     ) : (
-                      <div className="aspect-video bg-cold-shadow-blue/30 rounded-xl border border-icy-slate/40 border-dashed flex items-center justify-center text-steel-winter">
+                      <div className="aspect-video bg-cold-shadow-blue/20 rounded-2xl border border-icy-slate/30 border-dashed flex items-center justify-center text-steel-winter">
                         <p className="text-sm">Podglad wyniku po konwersji</p>
                       </div>
                     )}
+                    </div>
                   </div>
 
-                  {/* Actions Bar */}
-                  <div className="bg-frozen-spruce/70 rounded-2xl p-4 border border-icy-slate/30 shadow-[0_10px_30px_rgba(0,0,0,0.25)] space-y-4">
+                  <div className="space-y-6">
+                    <div className="bg-frozen-spruce/70 rounded-2xl p-5 border border-icy-slate/30 shadow-[0_18px_35px_rgba(0,0,0,0.25)] backdrop-blur-sm space-y-4">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="min-w-0">
                         <div className="text-sm text-steel-winter truncate">
@@ -601,17 +610,17 @@ const App: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="text-xs font-mono text-steel-winter">
+                    <div className="text-xs font-mono text-steel-winter/80">
                       Status: {statusLine}
                     </div>
                   </div>
 
-                  {/* File List */}
-                  <div className="space-y-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-steel-winter">
-                      Pliki ({videoFiles.length})
+                  <div className="bg-frozen-spruce/60 rounded-2xl border border-icy-slate/30 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-icy-slate/20 flex items-center justify-between">
+                      <span className="text-[11px] uppercase tracking-[0.3em] text-steel-winter">Pliki</span>
+                      <span className="text-xs text-steel-winter">{videoFiles.length}</span>
                     </div>
-                    <div className="space-y-3">
+                    <div className="divide-y divide-icy-slate/20">
                       {videoFiles.map((item) => {
                         const itemProgress = clampProgress(item.progress);
                         const isItemActive = activeFile?.id === item.id;
@@ -624,13 +633,11 @@ const App: React.FC = () => {
                           <div
                             key={item.id}
                             onClick={() => setActiveFileId(item.id)}
-                            className={`rounded-xl border transition-colors cursor-pointer ${
-                              isItemActive
-                                ? 'border-deep-forest-teal/60 bg-cold-shadow-blue/40'
-                                : 'border-icy-slate/30 bg-frozen-spruce/50'
+                            className={`px-4 py-3 transition-colors cursor-pointer ${
+                              isItemActive ? 'bg-cold-shadow-blue/40' : 'hover:bg-cold-shadow-blue/20'
                             }`}
                           >
-                            <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="min-w-0">
                                 <p className="text-sm font-semibold text-frost truncate">{item.name}</p>
                                 <p className="text-xs text-steel-winter">
@@ -701,10 +708,10 @@ const App: React.FC = () => {
                             </div>
 
                             {(isItemConverting || isItemQueued) && (
-                              <div className="px-4 pb-4">
-                                <div className="w-full bg-icy-slate/30 rounded-full h-2.5 overflow-hidden">
+                              <div className="mt-3">
+                                <div className="w-full bg-icy-slate/30 rounded-full h-2 overflow-hidden">
                                   <div
-                                    className="bg-deep-forest-teal h-2.5 rounded-full transition-all duration-300"
+                                    className="bg-deep-forest-teal h-2 rounded-full transition-all duration-300"
                                     style={{ width: `${itemProgress}%` }}
                                   />
                                 </div>
@@ -715,7 +722,7 @@ const App: React.FC = () => {
                             )}
 
                             {item.status === 'error' && item.error && (
-                              <div className="px-4 pb-4 text-xs text-red-200">
+                              <div className="text-xs text-red-200 mt-2">
                                 {item.error}
                               </div>
                             )}
@@ -724,37 +731,10 @@ const App: React.FC = () => {
                       })}
                     </div>
                   </div>
-
-                </div>
-              )}
-            </div>
-
-            {/* Right Column: AI Features */}
-            <div className="lg:col-span-1">
-              {activeFile ? (
-                <CaptionGenerator fileName={activeFile.name} />
-              ) : (
-                <div className="h-full flex items-center justify-center p-8 text-center border border-icy-slate/40 border-dashed rounded-2xl bg-cold-shadow-blue/30">
-                  <div className="space-y-3 opacity-60">
-                    <Sparkles className="mx-auto text-steel-winter" size={32} />
-                    <p className="text-steel-winter text-sm">
-                      Wgraj wideo, aby skorzystac z generatora opisow AI.
-                    </p>
                   </div>
+
                 </div>
               )}
-              
-              <div className="mt-6 p-4 bg-frozen-spruce/60 rounded-xl border border-icy-slate/40 text-xs text-steel-winter shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
-                <h4 className="font-display font-semibold text-frost mb-2 flex items-center gap-2">
-                  <AlertCircle size={14} />
-                  Informacja techniczna
-                </h4>
-                <p>
-                  Aplikacja uzywa FFmpeg WebAssembly do konwersji wewnatrz przegladarki. 
-                  Duze pliki moga wymagac wiecej pamieci RAM. 
-                  Jesli strona \"zamuli\", sprobuj z mniejszym plikiem.
-                </p>
-              </div>
             </div>
 
           </div>

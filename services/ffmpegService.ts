@@ -26,11 +26,33 @@ const resolvePercentFromRatio = (ratio: number): number | null => {
   return ratio * 100;
 };
 
-const QUALITY_PRESETS: Record<VideoQualityPreset, { crf: string; preset: string }> = {
-  high: { crf: '18', preset: 'veryfast' },
-  mid: { crf: '22', preset: 'veryfast' },
-  low: { crf: '26', preset: 'faster' },
+const parseLogTime = (message: string): number | null => {
+  const match = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(message);
+  if (!match) return null;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+
+  if (![hours, minutes, seconds].every((value) => Number.isFinite(value))) return null;
+
+  return hours * 3600 + minutes * 60 + seconds;
 };
+
+const QUALITY_PRESETS: Record<VideoQualityPreset, { crf: string; preset: string; bitrateFactor: number }> = {
+  high: { crf: '18', preset: 'veryfast', bitrateFactor: 1 },
+  mid: { crf: '22', preset: 'veryfast', bitrateFactor: 0.75 },
+  low: { crf: '26', preset: 'faster', bitrateFactor: 0.5 },
+};
+
+const AUDIO_BITRATE = 192_000;
+const MIN_VIDEO_BITRATE = 300_000;
+const MAX_VIDEO_BITRATE = 12_000_000;
+
+const toKbps = (value: number) => `${Math.max(1, Math.round(value / 1000))}k`;
+
+const estimateInputBitrate = (fileSizeBytes: number, durationSeconds: number) =>
+  (fileSizeBytes * 8) / durationSeconds;
 
 class FFmpegService {
   private ffmpeg: any = null;
@@ -111,13 +133,7 @@ class FFmpegService {
     // Zapis pliku do wirtualnego systemu plików WASM
     await this.ffmpeg.writeFile(inputName, await fetchFile(file));
 
-    const progressHandler = ({ progress, time }: { progress: number; time: number }) => {
-      const percentFromTime = normalizedDuration
-        ? resolvePercentFromTime(time, normalizedDuration)
-        : null;
-      const percentFromRatio = resolvePercentFromRatio(progress);
-      const nextPercent = percentFromTime ?? percentFromRatio;
-
+    const updateProgress = (nextPercent: number | null) => {
       if (nextPercent === null) return;
 
       const clamped = clampNumber(Math.round(nextPercent), 0, 100);
@@ -127,14 +143,45 @@ class FFmpegService {
       onProgress(lastPercent);
     };
 
+    const progressHandler = ({ progress, time }: { progress: number; time: number }) => {
+      const percentFromTime = normalizedDuration
+        ? resolvePercentFromTime(time, normalizedDuration)
+        : null;
+      const percentFromRatio = resolvePercentFromRatio(progress);
+      updateProgress(percentFromTime ?? percentFromRatio);
+    };
+
+    const logHandler = ({ message }: { message: string }) => {
+      if (!normalizedDuration) return;
+      const seconds = parseLogTime(message);
+      if (seconds === null) return;
+      updateProgress(resolvePercentFromTime(seconds, normalizedDuration));
+    };
+
     this.ffmpeg.on('progress', progressHandler);
+    this.ffmpeg.on('log', logHandler);
 
     const presetConfig = QUALITY_PRESETS[qualityPreset] ?? QUALITY_PRESETS.high;
+    const estimatedInputBitrate = normalizedDuration
+      ? estimateInputBitrate(file.size, normalizedDuration)
+      : null;
+    const availableVideoBitrate = estimatedInputBitrate
+      ? Math.max(0, estimatedInputBitrate - AUDIO_BITRATE)
+      : null;
+    const targetVideoBitrate = availableVideoBitrate
+      ? clampNumber(
+          Math.round(availableVideoBitrate * presetConfig.bitrateFactor),
+          MIN_VIDEO_BITRATE,
+          MAX_VIDEO_BITRATE
+        )
+      : null;
+    const maxVideoBitrate = targetVideoBitrate ? Math.round(targetVideoBitrate * 1.15) : null;
+    const bufferSize = targetVideoBitrate ? Math.round(targetVideoBitrate * 2) : null;
 
     // Konwersja: WebM -> MP4 (H.264/AAC) - standard Instagrama
     // Używamy presetu zależnie od wybranego profilu jakości
     try {
-      await this.ffmpeg.exec([
+      const args = [
         '-i', inputName,
         '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
         '-r', '30',
@@ -143,7 +190,13 @@ class FFmpegService {
         '-profile:v', 'high',
         '-level', '4.1',
         '-preset', presetConfig.preset,
-        '-crf', presetConfig.crf,       // Balans jako??/rozmiar
+        ...(targetVideoBitrate
+          ? [
+              '-b:v', toKbps(targetVideoBitrate),
+              '-maxrate', toKbps(maxVideoBitrate ?? targetVideoBitrate),
+              '-bufsize', toKbps(bufferSize ?? targetVideoBitrate * 2),
+            ]
+          : ['-crf', presetConfig.crf]),
         '-c:a', 'aac',
         '-b:a', '192k',
         '-ar', '48000',
@@ -151,9 +204,11 @@ class FFmpegService {
         '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilno?ci z odtwarzaczami mobilnymi
         '-movflags', '+faststart',
         outputName
-      ]);
+      ];
+      await this.ffmpeg.exec(args);
     } finally {
       this.ffmpeg.off('progress', progressHandler);
+      this.ffmpeg.off('log', logHandler);
     }
 
     // Odczyt wyniku
