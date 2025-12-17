@@ -607,9 +607,9 @@ const App: React.FC = () => {
                     <p className="text-xs text-steel-winter">{selectedPresetDescription}</p>
 
                     {activeIsConverting && (
-                      <div className="w-full bg-icy-slate/30 rounded-full h-2.5 overflow-hidden">
-                        <div 
-                          className="bg-deep-forest-teal h-2.5 rounded-full transition-all duration-300" 
+                      <div className="w-full bg-icy-slate/45 rounded-full h-3 overflow-hidden shadow-[inset_0_0_6px_rgba(0,0,0,0.45)] ring-1 ring-icy-slate/40">
+                        <div
+                          className="bg-gradient-to-r from-deep-forest-teal via-deep-forest-teal/90 to-old-wood h-3 rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(34,58,58,0.55)]"
                           style={{ width: `${activeProgress}%` }}
                         ></div>
                       </div>
@@ -714,9 +714,9 @@ const App: React.FC = () => {
 
                             {(isItemConverting || isItemQueued) && (
                               <div className="mt-3">
-                                <div className="w-full bg-icy-slate/30 rounded-full h-2 overflow-hidden">
+                                <div className="w-full bg-icy-slate/45 rounded-full h-2.5 overflow-hidden shadow-[inset_0_0_6px_rgba(0,0,0,0.35)] ring-1 ring-icy-slate/30">
                                   <div
-                                    className="bg-deep-forest-teal h-2 rounded-full transition-all duration-300"
+                                    className="bg-gradient-to-r from-deep-forest-teal via-deep-forest-teal/90 to-old-wood h-2.5 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(34,58,58,0.45)]"
                                     style={{ width: `${itemProgress}%` }}
                                   />
                                 </div>
