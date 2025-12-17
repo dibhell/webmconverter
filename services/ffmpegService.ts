@@ -16,6 +16,15 @@ const resolveTimeSeconds = (time: number, durationSeconds: number): number | nul
   return null;
 };
 
+const coerceNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
 const resolvePercentFromTime = (time: number, durationSeconds: number): number | null => {
   const seconds = resolveTimeSeconds(time, durationSeconds);
   if (seconds === null) return null;
@@ -163,7 +172,7 @@ class FFmpegService {
     // Zapis pliku do wirtualnego systemu plików WASM
     await this.ffmpeg.writeFile(inputName, await fetchFile(file));
 
-    if (!resolvedDurationSeconds) {
+    if (!resolvedDurationSeconds && typeof this.ffmpeg.ffprobe === 'function') {
       try {
         const probeOutput = 'probe.txt';
         await this.ffmpeg.ffprobe([
@@ -203,18 +212,18 @@ class FFmpegService {
       ratio,
       time,
     }: {
-      progress?: number;
-      ratio?: number;
-      time?: number;
+      progress?: number | string;
+      ratio?: number | string;
+      time?: number | string;
     }) => {
-      const ratioValue =
-        typeof progress === 'number' && Number.isFinite(progress) ? progress : ratio;
+      const ratioValue = coerceNumber(progress) ?? coerceNumber(ratio);
+      const timeValue = coerceNumber(time);
       const percentFromTime =
-        resolvedDurationSeconds && typeof time === 'number'
-          ? resolvePercentFromTime(time, resolvedDurationSeconds)
+        resolvedDurationSeconds && timeValue !== null
+          ? resolvePercentFromTime(timeValue, resolvedDurationSeconds)
           : null;
       const percentFromRatio =
-        typeof ratioValue === 'number' ? resolvePercentFromRatio(ratioValue) : null;
+        ratioValue !== null ? resolvePercentFromRatio(ratioValue) : null;
       updateProgress(percentFromTime ?? percentFromRatio);
     };
 
