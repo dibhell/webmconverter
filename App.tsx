@@ -29,7 +29,8 @@ const STATUS_LABELS: Record<FileConversionStatus, string> = {
 };
 
 const formatFileSize = (size: number) => `${(size / 1024 / 1024).toFixed(2)} MB`;
-const clampProgress = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
+const clampProgress = (value: number) => Math.min(100, Math.max(0, value));
+const formatProgressLabel = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
 const fileKey = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 const createFileId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -481,7 +482,7 @@ const App: React.FC = () => {
                         </div>
                         <div className="text-xs text-steel-winter">
                           Status: {activeStatus ? STATUS_LABELS[activeStatus] : ''}
-                          {activeIsConverting && ` • ${activeProgress}%`}
+                          {activeIsConverting && ` • ${formatProgressLabel(activeProgress)}%`}
                         </div>
                       </div>
 
@@ -512,7 +513,7 @@ const App: React.FC = () => {
                             {activeIsConverting ? (
                               <>
                                 <RefreshCw className="animate-spin" size={16} />
-                                Przetwarzanie {activeProgress}%
+                                Przetwarzanie {formatProgressLabel(activeProgress)}%
                               </>
                             ) : activeIsQueued ? (
                               <>
@@ -646,7 +647,7 @@ const App: React.FC = () => {
                                 <p className="text-sm font-semibold text-frost truncate">{item.name}</p>
                                 <p className="text-xs text-steel-winter">
                                   {formatFileSize(item.size)} • {STATUS_LABELS[item.status]}
-                                  {item.status === 'converting' && ` • ${itemProgress}%`}
+                                  {item.status === 'converting' && ` • ${formatProgressLabel(itemProgress)}%`}
                                 </p>
                               </div>
 
@@ -677,7 +678,7 @@ const App: React.FC = () => {
                                     {item.status === 'converting' ? (
                                       <>
                                         <RefreshCw className="animate-spin" size={14} />
-                                        {itemProgress}%
+                                        {formatProgressLabel(itemProgress)}%
                                       </>
                                     ) : item.status === 'queued' ? (
                                       <>
@@ -720,7 +721,7 @@ const App: React.FC = () => {
                                   />
                                 </div>
                                 <div className="text-xs text-steel-winter mt-2">
-                                  {isItemQueued ? 'W kolejce' : `Postep: ${itemProgress}%`}
+                                  {isItemQueued ? 'W kolejce' : `Postep: ${formatProgressLabel(itemProgress)}%`}
                                 </div>
                               </div>
                             )}

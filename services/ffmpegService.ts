@@ -172,35 +172,10 @@ class FFmpegService {
     // Zapis pliku do wirtualnego systemu plików WASM
     await this.ffmpeg.writeFile(inputName, await fetchFile(file));
 
-    if (!resolvedDurationSeconds && typeof this.ffmpeg.ffprobe === 'function') {
-      try {
-        const probeOutput = 'probe.txt';
-        await this.ffmpeg.ffprobe([
-          '-v', 'error',
-          '-show_entries', 'format=duration',
-          '-of', 'default=noprint_wrappers=1:nokey=1',
-          inputName,
-          '-o', probeOutput,
-        ]);
-        const probeData = await this.ffmpeg.readFile(probeOutput);
-        const probeText =
-          typeof probeData === 'string'
-            ? probeData
-            : new TextDecoder('utf-8').decode(probeData);
-        const parsed = Number.parseFloat(probeText.trim());
-        if (Number.isFinite(parsed) && parsed > 0) {
-          resolvedDurationSeconds = parsed;
-        }
-        await this.ffmpeg.deleteFile(probeOutput);
-      } catch (error) {
-        console.warn('FFprobe duration failed:', error);
-      }
-    }
-
     const updateProgress = (nextPercent: number | null) => {
       if (nextPercent === null) return;
 
-      const clamped = clampNumber(Math.round(nextPercent), 0, 100);
+      const clamped = clampNumber(nextPercent, 0, 100);
       if (clamped <= lastPercent) return;
 
       lastPercent = clamped;
@@ -262,6 +237,7 @@ class FFmpegService {
         '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
         '-r', String(TARGET_FPS),
         '-vsync', 'cfr',
+        '-loglevel', 'info',
         '-c:v', 'libx264',
         '-profile:v', 'high',
         '-level', '4.1',
@@ -277,6 +253,7 @@ class FFmpegService {
         '-movflags', '+faststart',
         '-progress', 'pipe:2',
         '-stats',
+        '-stats_period', '0.5',
         outputName
       ];
       const exitCode = await this.ffmpeg.exec(args);
