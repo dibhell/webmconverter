@@ -1,5 +1,6 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { VideoQualityPreset } from '../types';
 
 const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -23,6 +24,12 @@ const resolvePercentFromTime = (time: number, durationSeconds: number): number |
 const resolvePercentFromRatio = (ratio: number): number | null => {
   if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) return null;
   return ratio * 100;
+};
+
+const QUALITY_PRESETS: Record<VideoQualityPreset, { crf: string; preset: string }> = {
+  high: { crf: '18', preset: 'veryfast' },
+  mid: { crf: '22', preset: 'veryfast' },
+  low: { crf: '26', preset: 'faster' },
 };
 
 class FFmpegService {
@@ -87,7 +94,8 @@ class FFmpegService {
   public async convertWebMToMp4(
     file: File,
     onProgress: (progress: number) => void,
-    durationSeconds?: number
+    durationSeconds?: number,
+    qualityPreset: VideoQualityPreset = 'high'
   ): Promise<Blob> {
     if (!this.ffmpeg || !this.loaded) {
       throw new Error('FFmpeg nie jest załadowany. Odśwież stronę.');
@@ -121,8 +129,10 @@ class FFmpegService {
 
     this.ffmpeg.on('progress', progressHandler);
 
+    const presetConfig = QUALITY_PRESETS[qualityPreset] ?? QUALITY_PRESETS.high;
+
     // Konwersja: WebM -> MP4 (H.264/AAC) - standard Instagrama
-    // Używamy presetu 'veryfast' dla lepszej jakości i kompatybilności
+    // Używamy presetu zależnie od wybranego profilu jakości
     try {
       await this.ffmpeg.exec([
         '-i', inputName,
@@ -132,8 +142,8 @@ class FFmpegService {
         '-c:v', 'libx264',
         '-profile:v', 'high',
         '-level', '4.1',
-        '-preset', 'veryfast',
-        '-crf', '20',       // Balans jako??/rozmiar
+        '-preset', presetConfig.preset,
+        '-crf', presetConfig.crf,       // Balans jako??/rozmiar
         '-c:a', 'aac',
         '-b:a', '192k',
         '-ar', '48000',
