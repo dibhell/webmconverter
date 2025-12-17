@@ -1,51 +1,46 @@
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
+
 class FFmpegService {
   private ffmpeg: any = null;
   private loaded: boolean = false;
-  private fetchFile: any = null;
 
   public async load(onLog: (msg: string) => void): Promise<void> {
     if (this.loaded) return;
 
+    // Sprawdzenie izolacji (SharedArrayBuffer)
     if (!window.crossOriginIsolated) {
       throw new Error(
         'Brak izolacji origin (Cross-Origin Isolated). ' +
-        'Wymagane nagłówki COOP/COEP. Upewnij się, że używasz HTTPS lub localhost.'
+        'Aplikacja wymaga nagłówków COOP/COEP. Odśwież stronę (automatyczny reload powinien zadziałać).'
       );
     }
 
     try {
-      onLog("Pobieranie modułów FFmpeg (ESM/esm.sh)...");
-      
-      // We use esm.sh because it resolves internal dependencies (like @ffmpeg/util)
-      // to absolute URLs, preventing "bare import" errors in the browser.
-      const FFmpegImport = await import("https://esm.sh/@ffmpeg/ffmpeg@0.12.10");
-      const { toBlobURL, fetchFile } = await import("https://esm.sh/@ffmpeg/util@0.12.1");
+      onLog("Konfiguracja środowiska FFmpeg...");
 
-      const FFmpeg = FFmpegImport.FFmpeg;
-      this.fetchFile = fetchFile;
-
-      onLog("Inicjalizacja silnika...");
       this.ffmpeg = new FFmpeg();
 
       this.ffmpeg.on('log', ({ message }: { message: string }) => {
         onLog(message);
       });
 
+      // Wersje bibliotek na CDN (zgodne ze sobą)
+      // Core 0.12.6 jest stabilny dla FFmpeg 0.12.x
       const CORE_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-      
-      onLog("Konfigurowanie workera...");
+      const FFMPEG_VERSION = '0.12.10';
 
-      // WORKER STRATEGY:
-      // 1. Create a local Blob for the worker (satisfies "same-origin" policy for new Worker()).
-      // 2. Inside the Blob, import the worker logic from esm.sh (satisfies dependency resolution).
-      // 3. esm.sh handles the cross-origin imports correctly via CORS headers.
-      const workerBlob = new Blob(
-        [`import "https://esm.sh/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js";`],
-        { type: 'text/javascript' }
-      );
+      onLog("Przygotowanie Workera...");
+
+      // TWORZENIE WORKERA (Rozwiązanie problemu CORS i Builda):
+      // 1. Nie importujemy URL w TypeScript (psuje build).
+      // 2. Tworzymy Blob z kodem JS, który importuje workera z esm.sh.
+      // 3. esm.sh rozwiązuje zależności i nagłówki CORS.
+      const workerCode = `import "https://esm.sh/@ffmpeg/ffmpeg@${FFMPEG_VERSION}/dist/esm/worker.js";`;
+      const workerBlob = new Blob([workerCode], { type: 'text/javascript' });
       const workerURL = URL.createObjectURL(workerBlob);
 
-      onLog("Ładowanie rdzenia WebAssembly...");
+      onLog("Pobieranie WebAssembly (ok. 30MB)...");
 
       await this.ffmpeg.load({
         coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, 'text/javascript'),
@@ -54,9 +49,14 @@ class FFmpegService {
       });
 
       this.loaded = true;
+      onLog("FFmpeg załadowany pomyślnie.");
     } catch (error: any) {
       console.error("FFmpeg load error:", error);
-      throw new Error(`Błąd inicjalizacji FFmpeg: ${error.message}`);
+      // Bardziej przyjazny komunikat błędu
+      const msg = error.message.includes("Failed to construct 'Worker'") 
+        ? "Błąd tworzenia Workera. Twoja przeglądarka może blokować skrypty z CDN."
+        : error.message;
+      throw new Error(msg);
     }
   }
 
@@ -64,34 +64,39 @@ class FFmpegService {
     file: File, 
     onProgress: (progress: number) => void
   ): Promise<Blob> {
-    if (!this.ffmpeg || !this.loaded || !this.fetchFile) {
-      throw new Error('FFmpeg not loaded');
+    if (!this.ffmpeg || !this.loaded) {
+      throw new Error('FFmpeg nie jest załadowany. Odśwież stronę.');
     }
 
     const inputName = 'input.webm';
     const outputName = 'output.mp4';
 
-    await this.ffmpeg.writeFile(inputName, await this.fetchFile(file));
+    // Zapis pliku do wirtualnego systemu plików WASM
+    await this.ffmpeg.writeFile(inputName, await fetchFile(file));
 
     this.ffmpeg.on('progress', ({ progress }: { progress: number }) => {
-      onProgress(Math.round(progress * 100));
+      // Progress w FFmpeg 0.12 jest od 0 do 1
+      onProgress(Math.min(100, Math.round(progress * 100)));
     });
 
-    // Run conversion: WebM -> MP4 (H.264/AAC) for Instagram compatibility
+    // Konwersja: WebM -> MP4 (H.264/AAC) - standard Instagrama
+    // Używamy presetu 'ultrafast' dla szybkości w przeglądarce
     await this.ffmpeg.exec([
       '-i', inputName,
       '-c:v', 'libx264',
       '-preset', 'ultrafast',
-      '-crf', '23',
+      '-crf', '23',       // Balans jakość/rozmiar
       '-c:a', 'aac',
       '-b:a', '128k',
-      '-pix_fmt', 'yuv420p',
+      '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilności z odtwarzaczami mobilnymi
       '-movflags', '+faststart',
       outputName
     ]);
 
+    // Odczyt wyniku
     const data = await this.ffmpeg.readFile(outputName);
     
+    // Sprzątanie
     await this.ffmpeg.deleteFile(inputName);
     await this.ffmpeg.deleteFile(outputName);
 
