@@ -28,7 +28,7 @@ class FFmpegService {
       // Wersje bibliotek na CDN (zgodne ze sobą)
       // Core 0.12.6 jest stabilny dla FFmpeg 0.12.x
       const CORE_BASE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-      const FFMPEG_VERSION = '0.12.10';
+      const FFMPEG_VERSION = '0.12.15';
 
       onLog("Przygotowanie Workera...");
 
@@ -38,14 +38,14 @@ class FFmpegService {
       // 3. esm.sh rozwiązuje zależności i nagłówki CORS.
       const workerCode = `import "https://esm.sh/@ffmpeg/ffmpeg@${FFMPEG_VERSION}/dist/esm/worker.js";`;
       const workerBlob = new Blob([workerCode], { type: 'text/javascript' });
-      const workerURL = URL.createObjectURL(workerBlob);
+      const classWorkerURL = URL.createObjectURL(workerBlob);
 
       onLog("Pobieranie WebAssembly (ok. 30MB)...");
 
       await this.ffmpeg.load({
+        classWorkerURL,
         coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
-        workerURL: workerURL,
       });
 
       this.loaded = true;
