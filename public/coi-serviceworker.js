@@ -49,7 +49,8 @@ if (typeof window === 'undefined') {
 
         const n = navigator;
         if (n.serviceWorker) {
-            n.serviceWorker.register(window.document.currentScript.src || 'coi-serviceworker.js').then(
+            const swUrl = new URL('./coi-serviceworker.js', import.meta.url).toString();
+            n.serviceWorker.register(swUrl, { type: "module" }).then(
                 (registration) => {
                     console.log("COI Service Worker registered");
                     

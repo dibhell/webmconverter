@@ -122,18 +122,25 @@ class FFmpegService {
     this.ffmpeg.on('progress', progressHandler);
 
     // Konwersja: WebM -> MP4 (H.264/AAC) - standard Instagrama
-    // Używamy presetu 'ultrafast' dla szybkości w przeglądarce
+    // Używamy presetu 'veryfast' dla lepszej jakości i kompatybilności
     try {
       await this.ffmpeg.exec([
-      '-i', inputName,
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '23',       // Balans jakość/rozmiar
-      '-c:a', 'aac',
-      '-b:a', '128k',
-      '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilności z odtwarzaczami mobilnymi
-      '-movflags', '+faststart',
-      outputName
+        '-i', inputName,
+        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        '-r', '30',
+        '-vsync', 'cfr',
+        '-c:v', 'libx264',
+        '-profile:v', 'high',
+        '-level', '4.1',
+        '-preset', 'veryfast',
+        '-crf', '20',       // Balans jako??/rozmiar
+        '-c:a', 'aac',
+        '-b:a', '160k',
+        '-ar', '48000',
+        '-ac', '2',
+        '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilno?ci z odtwarzaczami mobilnymi
+        '-movflags', '+faststart',
+        outputName
       ]);
     } finally {
       this.ffmpeg.off('progress', progressHandler);

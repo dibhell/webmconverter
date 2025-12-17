@@ -5,7 +5,7 @@ import FileUploader from './components/FileUploader';
 import VideoPreview from './components/VideoPreview';
 import CaptionGenerator from './components/CaptionGenerator';
 import { VideoFile, ConversionStatus } from './types';
-import { Download, RefreshCw, AlertCircle, CheckCircle2, Instagram, Sparkles, ShieldAlert } from 'lucide-react';
+import { Download, RefreshCw, AlertCircle, Sparkles, ShieldAlert, Instagram } from 'lucide-react';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<ConversionStatus>(ConversionStatus.IDLE);
@@ -150,8 +150,13 @@ const App: React.FC = () => {
       <header className="border-b border-icy-slate/40 bg-frozen-spruce/70 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-deep-forest-teal p-2 rounded-lg shadow-[0_0_0_1px_rgba(92,111,120,0.5)]">
-              <Instagram className="text-frost" size={20} />
+            <div className="relative bg-charcoal-bark/70 p-1.5 rounded-lg shadow-[0_0_0_1px_rgba(92,111,120,0.5)]">
+              <Instagram className="text-frost" size={22} />
+              <img
+                src="/ico.png"
+                alt="" aria-hidden="true"
+                className="absolute inset-0 h-full w-full rounded-md object-cover"
+              />
             </div>
             <div>
               <h1 className="text-xl font-display font-semibold tracking-wide text-frost">

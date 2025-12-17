@@ -108,7 +108,7 @@ const CaptionGenerator: React.FC<CaptionGeneratorProps> = ({ fileName }) => {
               onClick={handleCopy}
               className="flex items-center gap-2 text-xs font-medium text-steel-winter hover:text-frost transition-colors ml-auto"
             >
-              {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+              {copied ? <Check size={14} className="text-deep-forest-teal" /> : <Copy size={14} />}
               {copied ? 'Skopiowano!' : 'Kopiuj całość'}
             </button>
           </div>
