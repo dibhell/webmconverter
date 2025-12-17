@@ -21,13 +21,27 @@ const resolvePercentFromTime = (time: number, durationSeconds: number): number |
   return (seconds / durationSeconds) * 100;
 };
 
-const resolvePercentFromRatio = (ratio: number): number | null => {
-  if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) return null;
-  return ratio * 100;
+const resolvePercentFromRatio = (value: number): number | null => {
+  if (!Number.isFinite(value) || value < 0) return null;
+  if (value <= 1) return value * 100;
+  if (value <= 100) return value;
+  return null;
 };
 
-const parseLogTime = (message: string): number | null => {
-  const match = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(message);
+const parseProgressTimeSeconds = (message: string): number | null => {
+  const outTimeMsMatch = /out_time_ms=(\d+)/.exec(message);
+  if (outTimeMsMatch) {
+    const ms = Number(outTimeMsMatch[1]);
+    return Number.isFinite(ms) ? ms / 1000 : null;
+  }
+
+  const outTimeUsMatch = /out_time_us=(\d+)/.exec(message);
+  if (outTimeUsMatch) {
+    const us = Number(outTimeUsMatch[1]);
+    return Number.isFinite(us) ? us / 1000000 : null;
+  }
+
+  const match = /(?:time|out_time)=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(message);
   if (!match) return null;
 
   const hours = Number(match[1]);
@@ -150,11 +164,23 @@ class FFmpegService {
       onProgress(lastPercent);
     };
 
-    const progressHandler = ({ progress, time }: { progress: number; time: number }) => {
-      const percentFromTime = resolvedDurationSeconds
-        ? resolvePercentFromTime(time, resolvedDurationSeconds)
-        : null;
-      const percentFromRatio = resolvePercentFromRatio(progress);
+    const progressHandler = ({
+      progress,
+      ratio,
+      time,
+    }: {
+      progress?: number;
+      ratio?: number;
+      time?: number;
+    }) => {
+      const ratioValue =
+        typeof progress === 'number' && Number.isFinite(progress) ? progress : ratio;
+      const percentFromTime =
+        resolvedDurationSeconds && typeof time === 'number'
+          ? resolvePercentFromTime(time, resolvedDurationSeconds)
+          : null;
+      const percentFromRatio =
+        typeof ratioValue === 'number' ? resolvePercentFromRatio(ratioValue) : null;
       updateProgress(percentFromTime ?? percentFromRatio);
     };
 
@@ -165,7 +191,7 @@ class FFmpegService {
           resolvedDurationSeconds = durationFromLog;
         }
       }
-      const seconds = parseLogTime(message);
+      const seconds = parseProgressTimeSeconds(message);
       if (seconds === null || !resolvedDurationSeconds) return;
       updateProgress(resolvePercentFromTime(seconds, resolvedDurationSeconds));
     };
@@ -181,11 +207,11 @@ class FFmpegService {
     // Konwersja: WebM -> MP4 (H.264/AAC) - standard Instagrama
     // Używamy presetu zależnie od wybranego profilu jakości
     try {
-      const args = [
-        '-i', inputName,
-        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-        '-r', '30',
-        '-vsync', 'cfr',
+    const args = [
+      '-i', inputName,
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      '-r', '30',
+      '-vsync', 'cfr',
         '-c:v', 'libx264',
         '-profile:v', 'high',
         '-level', '4.1',
@@ -194,13 +220,15 @@ class FFmpegService {
         '-maxrate', toKbps(maxVideoBitrate),
         '-bufsize', toKbps(bufferSize),
         '-c:a', 'aac',
-        '-b:a', '192k',
-        '-ar', '48000',
-        '-ac', '2',
-        '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilno?ci z odtwarzaczami mobilnymi
-        '-movflags', '+faststart',
-        outputName
-      ];
+      '-b:a', '192k',
+      '-ar', '48000',
+      '-ac', '2',
+      '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilno?ci z odtwarzaczami mobilnymi
+      '-movflags', '+faststart',
+      '-progress', 'pipe:1',
+      '-nostats',
+      outputName
+    ];
       await this.ffmpeg.exec(args);
     } finally {
       this.ffmpeg.off('progress', progressHandler);
