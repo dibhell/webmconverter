@@ -70,7 +70,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFilesSelected, disabled, 
         onChange={handleInputChange}
         disabled={disabled}
       />
-      <div className={`${isCompact ? 'w-10 h-10' : 'w-14 h-14'} bg-deep-forest-teal/35 rounded-full flex items-center justify-center text-frost shadow-[0_0_0_1px_rgba(92,111,120,0.5)]`}>
+      <div className={`${isCompact ? 'w-10 h-10' : 'w-14 h-14'} bg-deep-forest-teal/35 rounded-full flex items-center justify-center text-frost shadow-[0_0_0_1px_rgba(136,136,136,0.45)]`}>
         {disabled ? <FileVideo size={isCompact ? 20 : 32} /> : <Upload size={isCompact ? 20 : 32} />}
       </div>
       <div>

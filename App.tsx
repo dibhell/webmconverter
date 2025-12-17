@@ -342,16 +342,16 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen relative overflow-hidden bg-midnight-pine text-frost font-sans selection:bg-deep-forest-teal/60">
       <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(70%_60%_at_10%_0%,#344B5A_0%,#1F2A2E_55%,#1F2A2E_100%)]" />
-        <div className="absolute inset-0 opacity-70 bg-[radial-gradient(35%_35%_at_85%_15%,#2E3F43_0%,transparent_60%)]" />
-        <div className="absolute inset-0 opacity-25 bg-[linear-gradient(180deg,#223A3A_0%,#1F2A2E_45%,#1F2A2E_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(70%_60%_at_10%_0%,#615D64_0%,#0F0F10_55%,#0F0F10_100%)]" />
+        <div className="absolute inset-0 opacity-70 bg-[radial-gradient(35%_35%_at_85%_15%,#403E4C_0%,transparent_60%)]" />
+        <div className="absolute inset-0 opacity-25 bg-[linear-gradient(180deg,#686068_0%,#0F0F10_45%,#0F0F10_100%)]" />
       </div>
 
       {/* Header */}
       <header className="border-b border-icy-slate/40 bg-frozen-spruce/70 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative bg-charcoal-bark/70 p-1.5 rounded-lg shadow-[0_0_0_1px_rgba(92,111,120,0.5)]">
+            <div className="relative bg-charcoal-bark/70 p-1.5 rounded-lg shadow-[0_0_0_1px_rgba(136,136,136,0.5)]">
               <Instagram className="text-frost" size={22} />
               <img
                 src="./ico.png"
@@ -506,7 +506,7 @@ const App: React.FC = () => {
                                 activeIsConverting ||
                                 (isConverting && !activeIsConverting)
                                   ? 'bg-icy-slate/30 text-steel-winter cursor-not-allowed'
-                                  : 'bg-deep-forest-teal hover:bg-deep-forest-teal/90 text-frost shadow-[0_8px_20px_rgba(34,58,58,0.35)]'
+                                  : 'bg-deep-forest-teal hover:bg-deep-forest-teal/90 text-frost shadow-[0_8px_20px_rgba(104,96,104,0.35)]'
                               }
                             `}
                           >
@@ -533,7 +533,7 @@ const App: React.FC = () => {
                           <a
                             href={activeFile.outputUrl}
                             download={`converted_${activeFile.name.replace('.webm', '')}.mp4`}
-                            className="flex-1 sm:flex-none px-6 py-2.5 bg-old-wood hover:bg-charcoal-bark text-frost rounded-xl font-semibold text-sm shadow-[0_8px_20px_rgba(43,38,34,0.35)] flex items-center justify-center gap-2 transition-all"
+                            className="flex-1 sm:flex-none px-6 py-2.5 bg-old-wood hover:bg-charcoal-bark text-charcoal-bark hover:text-frost rounded-xl font-semibold text-sm shadow-[0_8px_20px_rgba(8,8,8,0.35)] flex items-center justify-center gap-2 transition-all"
                           >
                             <Download size={16} />
                             Pobierz MP4
@@ -609,7 +609,7 @@ const App: React.FC = () => {
                     {activeIsConverting && (
                       <div className="w-full bg-icy-slate/45 rounded-full h-3 overflow-hidden shadow-[inset_0_0_6px_rgba(0,0,0,0.45)] ring-1 ring-icy-slate/40">
                         <div
-                          className="bg-gradient-to-r from-deep-forest-teal via-deep-forest-teal/90 to-old-wood h-3 rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(34,58,58,0.55)]"
+                          className="bg-gradient-to-r from-deep-forest-teal via-deep-forest-teal/90 to-old-wood h-3 rounded-full transition-all duration-300 shadow-[0_0_12px_rgba(104,96,104,0.55)]"
                           style={{ width: `${activeProgress}%` }}
                         ></div>
                       </div>
@@ -657,7 +657,7 @@ const App: React.FC = () => {
                                     href={item.outputUrl}
                                     download={`converted_${item.name.replace('.webm', '')}.mp4`}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="px-3 py-2 bg-old-wood hover:bg-charcoal-bark text-frost rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors"
+                                    className="px-3 py-2 bg-old-wood hover:bg-charcoal-bark text-charcoal-bark hover:text-frost rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors"
                                   >
                                     <Download size={14} />
                                     Pobierz
@@ -716,7 +716,7 @@ const App: React.FC = () => {
                               <div className="mt-3">
                                 <div className="w-full bg-icy-slate/45 rounded-full h-2.5 overflow-hidden shadow-[inset_0_0_6px_rgba(0,0,0,0.35)] ring-1 ring-icy-slate/30">
                                   <div
-                                    className="bg-gradient-to-r from-deep-forest-teal via-deep-forest-teal/90 to-old-wood h-2.5 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(34,58,58,0.45)]"
+                                    className="bg-gradient-to-r from-deep-forest-teal via-deep-forest-teal/90 to-old-wood h-2.5 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(104,96,104,0.45)]"
                                     style={{ width: `${itemProgress}%` }}
                                   />
                                 </div>
@@ -746,7 +746,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="border-t border-icy-slate/30 bg-old-wood/80 py-8 mt-12 text-center text-steel-winter text-sm">
+      <footer className="border-t border-icy-slate/30 bg-old-wood/80 py-8 mt-12 text-center text-charcoal-bark text-sm">
         <p>&copy; {new Date().getFullYear()} InstaConvert AI. Działa w pełni prywatnie w Twojej przeglądarce.</p>
       </footer>
     </div>
