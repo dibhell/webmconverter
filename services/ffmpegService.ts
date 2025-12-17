@@ -135,7 +135,7 @@ class FFmpegService {
         '-preset', 'veryfast',
         '-crf', '20',       // Balans jako??/rozmiar
         '-c:a', 'aac',
-        '-b:a', '160k',
+        '-b:a', '192k',
         '-ar', '48000',
         '-ac', '2',
         '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilno?ci z odtwarzaczami mobilnymi
