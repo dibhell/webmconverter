@@ -12,6 +12,7 @@ export interface VideoFile {
   url: string;
   name: string;
   size: number;
+  durationSeconds?: number;
 }
 
 export interface LogMessage {

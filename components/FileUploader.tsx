@@ -39,9 +39,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, disabled })
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       className={`
-        border-2 border-dashed rounded-xl p-10 text-center transition-all duration-300
+        border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-300 shadow-[0_12px_30px_rgba(0,0,0,0.25)]
         flex flex-col items-center justify-center gap-4 cursor-pointer
-        ${disabled ? 'opacity-50 cursor-not-allowed border-slate-600 bg-slate-800/50' : 'border-indigo-500/50 hover:border-indigo-400 hover:bg-slate-800/80 bg-slate-800/30'}
+        ${disabled ? 'opacity-60 cursor-not-allowed border-icy-slate/40 bg-frozen-spruce/40' : 'border-icy-slate/50 hover:border-frost/40 hover:bg-cold-shadow-blue/50 bg-cold-shadow-blue/25'}
       `}
       onClick={() => !disabled && document.getElementById('fileInput')?.click()}
     >
@@ -53,14 +53,14 @@ const FileUploader: React.FC<FileUploaderProps> = ({ onFileSelected, disabled })
         onChange={handleInputChange}
         disabled={disabled}
       />
-      <div className="w-16 h-16 bg-indigo-500/10 rounded-full flex items-center justify-center text-indigo-400">
+      <div className="w-16 h-16 bg-deep-forest-teal/40 rounded-full flex items-center justify-center text-frost">
         {disabled ? <FileVideo size={32} /> : <Upload size={32} />}
       </div>
       <div>
-        <h3 className="text-lg font-semibold text-slate-200">
+        <h3 className="text-lg font-display font-semibold text-frost">
           Wybierz lub przeciągnij plik WebM
         </h3>
-        <p className="text-sm text-slate-400 mt-2">
+        <p className="text-sm text-steel-winter mt-2">
           Maksymalny rozmiar zależy od pamięci RAM twojego urządzenia.
         </p>
       </div>

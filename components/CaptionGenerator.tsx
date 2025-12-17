@@ -44,13 +44,13 @@ const CaptionGenerator: React.FC<CaptionGeneratorProps> = ({ fileName }) => {
   };
 
   return (
-    <div className="bg-slate-800/30 border border-indigo-500/20 rounded-xl p-6 mt-6">
+    <div className="bg-frozen-spruce/60 border border-icy-slate/40 rounded-2xl p-6 mt-6 shadow-[0_12px_30px_rgba(0,0,0,0.25)]">
       <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="text-indigo-400" size={20} />
-        <h2 className="text-xl font-semibold text-white">Generator Opisów AI</h2>
+        <Sparkles className="text-icy-slate" size={20} />
+        <h2 className="text-xl font-display font-semibold text-frost">Generator Opisów AI</h2>
       </div>
       
-      <p className="text-slate-400 text-sm mb-4">
+      <p className="text-steel-winter text-sm mb-4">
         Opisz krótko co dzieje się na wideo <strong>{fileName}</strong>, a Gemini stworzy dla Ciebie idealny post na Instagram.
       </p>
 
@@ -59,17 +59,17 @@ const CaptionGenerator: React.FC<CaptionGeneratorProps> = ({ fileName }) => {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Napisz np.: Kot bawi się czerwoną włóczką i spada z kanapy..."
-          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none min-h-[80px] text-sm"
+          className="w-full bg-midnight-pine/60 border border-icy-slate/50 rounded-xl p-3 text-frost focus:ring-2 focus:ring-deep-forest-teal/60 focus:border-transparent outline-none min-h-[80px] text-sm"
         />
 
         <button
           onClick={handleGenerate}
           disabled={loading || !description.trim()}
           className={`
-            w-full py-2.5 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors
+            w-full py-2.5 px-4 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-colors ring-1 ring-icy-slate/30
             ${loading || !description.trim() 
-              ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-              : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'}
+              ? 'bg-icy-slate/30 text-steel-winter cursor-not-allowed' 
+              : 'bg-deep-forest-teal hover:bg-deep-forest-teal/90 text-frost shadow-[0_8px_20px_rgba(34,58,58,0.35)]'}
           `}
         >
           {loading ? (
@@ -86,18 +86,18 @@ const CaptionGenerator: React.FC<CaptionGeneratorProps> = ({ fileName }) => {
         </button>
 
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+          <div className="p-3 bg-red-500/10 border border-red-400/30 rounded-xl text-red-200 text-sm">
             {error}
           </div>
         )}
 
         {result && (
-          <div className="bg-slate-900/80 rounded-lg border border-slate-700 p-4 animate-fade-in">
+          <div className="bg-midnight-pine/70 rounded-xl border border-icy-slate/40 p-4 animate-fade-in">
             <div className="prose prose-invert prose-sm max-w-none">
-              <p className="mb-4 text-slate-200 whitespace-pre-line">{result.caption}</p>
+              <p className="mb-4 text-frost whitespace-pre-line">{result.caption}</p>
               <div className="flex flex-wrap gap-2 mb-4">
                 {result.hashtags.map((tag, i) => (
-                  <span key={i} className="text-indigo-400 text-xs bg-indigo-400/10 px-2 py-1 rounded-full">
+                  <span key={i} className="text-frost text-xs bg-deep-forest-teal/40 px-2 py-1 rounded-full">
                     {tag}
                   </span>
                 ))}
@@ -106,7 +106,7 @@ const CaptionGenerator: React.FC<CaptionGeneratorProps> = ({ fileName }) => {
             
             <button
               onClick={handleCopy}
-              className="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors ml-auto"
+              className="flex items-center gap-2 text-xs font-medium text-steel-winter hover:text-frost transition-colors ml-auto"
             >
               {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
               {copied ? 'Skopiowano!' : 'Kopiuj całość'}
