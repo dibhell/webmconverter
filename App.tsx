@@ -145,13 +145,22 @@ const App: React.FC = () => {
       new Promise<number | undefined>((resolve) => {
         const video = document.createElement('video');
         video.preload = 'metadata';
+        let timeoutId: number | undefined;
 
         const cleanup = () => {
           video.onloadedmetadata = null;
           video.onerror = null;
+          if (timeoutId) {
+            window.clearTimeout(timeoutId);
+          }
           video.removeAttribute('src');
           video.load();
         };
+
+        timeoutId = window.setTimeout(() => {
+          cleanup();
+          resolve(undefined);
+        }, 8000);
 
         video.onloadedmetadata = () => {
           const duration = video.duration;

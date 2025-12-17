@@ -95,9 +95,11 @@ const toKbps = (value: number) => `${Math.max(1, Math.round(value / 1000))}k`;
 class FFmpegService {
   private ffmpeg: any = null;
   private loaded: boolean = false;
+  private logCallback: ((msg: string) => void) | null = null;
 
   public async load(onLog: (msg: string) => void): Promise<void> {
     if (this.loaded) return;
+    this.logCallback = onLog;
 
     // Sprawdzenie izolacji (SharedArrayBuffer)
     if (!window.crossOriginIsolated) {
@@ -151,6 +153,26 @@ class FFmpegService {
     }
   }
 
+  private async reinitialize(): Promise<void> {
+    if (this.ffmpeg) {
+      try {
+        this.ffmpeg.terminate();
+      } catch {
+        // ignore
+      }
+    }
+    this.ffmpeg = null;
+    this.loaded = false;
+
+    if (this.logCallback) {
+      try {
+        await this.load(this.logCallback);
+      } catch (error) {
+        console.warn('FFmpeg reload failed:', error);
+      }
+    }
+  }
+
   public async convertWebMToMp4(
     file: File,
     onProgress: (progress: number) => void,
@@ -168,6 +190,10 @@ class FFmpegService {
       : null;
     let resolvedDurationSeconds = normalizedDuration;
     let lastPercent = 0;
+    let lastActivityAt = Date.now();
+    const markActivity = () => {
+      lastActivityAt = Date.now();
+    };
 
     // Zapis pliku do wirtualnego systemu plików WASM
     await this.ffmpeg.writeFile(inputName, await fetchFile(file));
@@ -191,6 +217,7 @@ class FFmpegService {
       ratio?: number | string;
       time?: number | string;
     }) => {
+      markActivity();
       const ratioValue = coerceNumber(progress) ?? coerceNumber(ratio);
       const timeValue = coerceNumber(time);
       const percentFromTime =
@@ -203,6 +230,7 @@ class FFmpegService {
     };
 
     const logHandler = ({ message }: { message: string }) => {
+      markActivity();
       if (!resolvedDurationSeconds) {
         const durationFromLog = parseLogDuration(message);
         if (durationFromLog) {
@@ -228,10 +256,34 @@ class FFmpegService {
     const targetVideoBitrate = presetConfig.targetBitrate;
     const maxVideoBitrate = Math.round(targetVideoBitrate * 1.15);
     const bufferSize = Math.round(targetVideoBitrate * 2);
+    const fileSizeMb = file.size / (1024 * 1024);
+    const execTimeoutMs = resolvedDurationSeconds
+      ? Math.max(120000, Math.round(resolvedDurationSeconds * 4000))
+      : Math.max(120000, Math.round(fileSizeMb * 20000));
+    const stallTimeoutMs = 20000;
+    let outputData: Uint8Array | null = null;
+    let stallTimer: number | undefined;
+    let stalled = false;
 
     // Konwersja: WebM -> MP4 (H.264/AAC) - standard Instagrama
     // Używamy presetu zależnie od wybranego profilu jakości
     try {
+      const stallPromise = new Promise<never>((_, reject) => {
+        stallTimer = window.setInterval(() => {
+          if (stalled) return;
+          if (Date.now() - lastActivityAt < stallTimeoutMs) return;
+          stalled = true;
+          try {
+            this.ffmpeg?.terminate();
+          } catch {
+            // ignore
+          }
+          this.ffmpeg = null;
+          this.loaded = false;
+          reject(new Error('Konwersja przerwana: brak postepu przez 20 sekund.'));
+        }, 1000);
+      });
+
       const args = [
         '-i', inputName,
         '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
@@ -256,24 +308,45 @@ class FFmpegService {
         '-stats_period', '0.5',
         outputName
       ];
-      const exitCode = await this.ffmpeg.exec(args);
+      const exitCode = (await Promise.race([
+        this.ffmpeg.exec(args, execTimeoutMs),
+        stallPromise,
+      ])) as number;
       if (exitCode !== 0) {
         throw new Error(`FFmpeg zakonczyl sie bledem (kod ${exitCode}).`);
       }
+      outputData = await this.ffmpeg.readFile(outputName);
     } finally {
-      this.ffmpeg.off('progress', progressHandler);
-      this.ffmpeg.off('log', logHandler);
+      if (stallTimer) {
+        window.clearInterval(stallTimer);
+      }
+      if (this.ffmpeg) {
+        this.ffmpeg.off('progress', progressHandler);
+        this.ffmpeg.off('log', logHandler);
+
+        try {
+          await this.ffmpeg.deleteFile(inputName);
+        } catch {
+          // ignore
+        }
+        try {
+          await this.ffmpeg.deleteFile(outputName);
+        } catch {
+          // ignore
+        }
+      }
+      if (stalled) {
+        await this.reinitialize();
+      }
     }
 
-    // Odczyt wyniku
-    const data = await this.ffmpeg.readFile(outputName);
-    
-    // Sprzątanie
-    await this.ffmpeg.deleteFile(inputName);
-    await this.ffmpeg.deleteFile(outputName);
+    if (!outputData) {
+      throw new Error('Nie udalo sie odczytac pliku wynikowego.');
+    }
 
     onProgress(100);
-    return new Blob([data.buffer], { type: 'video/mp4' });
+    const safeOutput = new Uint8Array(outputData);
+    return new Blob([safeOutput], { type: 'video/mp4' });
   }
 
   public isLoaded(): boolean {
