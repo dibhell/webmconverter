@@ -15,9 +15,9 @@ type VideoItem = VideoFile & {
 };
 
 const QUALITY_OPTIONS: Array<{ value: VideoQualityPreset; label: string; description: string }> = [
-  { value: 'high', label: 'High', description: 'Najlepsza jakosc, wiekszy plik.' },
-  { value: 'mid', label: 'Mid', description: 'Balans jakosc/rozmiar.' },
-  { value: 'low', label: 'Low', description: 'Mniejszy plik, szybsza konwersja.' },
+  { value: 'high', label: 'High', description: 'Docelowo ok. 50 Mb/s (najlepsza jakosc).' },
+  { value: 'mid', label: 'Mid', description: 'Docelowo ok. 25 Mb/s (balans jakosc/rozmiar).' },
+  { value: 'low', label: 'Low', description: 'Docelowo ok. 16 Mb/s (mniejszy plik).' },
 ];
 
 const STATUS_LABELS: Record<FileConversionStatus, string> = {
