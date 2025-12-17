@@ -381,17 +381,13 @@ const App: React.FC = () => {
           <p className="text-[11px] uppercase tracking-[0.35em] text-steel-winter">
             Local-only pipeline
           </p>
-          <div className="mt-5 flex justify-center">
+          <div className="mt-6 flex justify-center">
             <img
               src="./ico.png"
               alt="InstaConvert AI"
-              className="h-20 w-20 md:h-24 md:w-24 rounded-2xl shadow-[0_14px_30px_rgba(0,0,0,0.35)] ring-1 ring-icy-slate/50 bg-charcoal-bark/60 object-cover"
+              className="h-24 w-24 md:h-32 md:w-32 rounded-2xl shadow-[0_18px_35px_rgba(0,0,0,0.35)] bg-charcoal-bark/60 object-cover"
             />
           </div>
-          <p className="text-steel-winter max-w-2xl mx-auto text-sm md:text-base">
-            Konwertuj pliki WebM do formatu MP4 obslugiwanego przez Instagram bez utraty jakosci.
-            Calosc dziala lokalnie w Twojej przegladarce, zapewniajac prywatnosc.
-          </p>
         </div>
 
         {!isSecure && (
