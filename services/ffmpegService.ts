@@ -3,6 +3,7 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import { VideoQualityPreset } from '../types';
 
 const clampNumber = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const TARGET_FPS = 30;
 
 const resolveTimeSeconds = (time: number, durationSeconds: number): number | null => {
   if (!Number.isFinite(time) || time <= 0) return null;
@@ -64,6 +65,14 @@ const parseLogDuration = (message: string): number | null => {
   if (![hours, minutes, seconds].every((value) => Number.isFinite(value))) return null;
 
   return hours * 3600 + minutes * 60 + seconds;
+};
+
+const parseLogFrame = (message: string): number | null => {
+  const match = /frame=\s*(\d+)/.exec(message);
+  if (!match) return null;
+
+  const frame = Number(match[1]);
+  return Number.isFinite(frame) ? frame : null;
 };
 
 const QUALITY_PRESETS: Record<VideoQualityPreset, { crf: string; preset: string; targetBitrate: number }> = {
@@ -154,6 +163,31 @@ class FFmpegService {
     // Zapis pliku do wirtualnego systemu plików WASM
     await this.ffmpeg.writeFile(inputName, await fetchFile(file));
 
+    if (!resolvedDurationSeconds) {
+      try {
+        const probeOutput = 'probe.txt';
+        await this.ffmpeg.ffprobe([
+          '-v', 'error',
+          '-show_entries', 'format=duration',
+          '-of', 'default=noprint_wrappers=1:nokey=1',
+          inputName,
+          '-o', probeOutput,
+        ]);
+        const probeData = await this.ffmpeg.readFile(probeOutput);
+        const probeText =
+          typeof probeData === 'string'
+            ? probeData
+            : new TextDecoder('utf-8').decode(probeData);
+        const parsed = Number.parseFloat(probeText.trim());
+        if (Number.isFinite(parsed) && parsed > 0) {
+          resolvedDurationSeconds = parsed;
+        }
+        await this.ffmpeg.deleteFile(probeOutput);
+      } catch (error) {
+        console.warn('FFprobe duration failed:', error);
+      }
+    }
+
     const updateProgress = (nextPercent: number | null) => {
       if (nextPercent === null) return;
 
@@ -192,8 +226,15 @@ class FFmpegService {
         }
       }
       const seconds = parseProgressTimeSeconds(message);
-      if (seconds === null || !resolvedDurationSeconds) return;
-      updateProgress(resolvePercentFromTime(seconds, resolvedDurationSeconds));
+      if (seconds !== null && resolvedDurationSeconds) {
+        updateProgress(resolvePercentFromTime(seconds, resolvedDurationSeconds));
+        return;
+      }
+      const frame = parseLogFrame(message);
+      if (frame !== null && resolvedDurationSeconds) {
+        const totalFrames = resolvedDurationSeconds * TARGET_FPS;
+        updateProgress((frame / totalFrames) * 100);
+      }
     };
 
     this.ffmpeg.on('progress', progressHandler);
@@ -207,11 +248,11 @@ class FFmpegService {
     // Konwersja: WebM -> MP4 (H.264/AAC) - standard Instagrama
     // Używamy presetu zależnie od wybranego profilu jakości
     try {
-    const args = [
-      '-i', inputName,
-      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
-      '-r', '30',
-      '-vsync', 'cfr',
+      const args = [
+        '-i', inputName,
+        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        '-r', String(TARGET_FPS),
+        '-vsync', 'cfr',
         '-c:v', 'libx264',
         '-profile:v', 'high',
         '-level', '4.1',
@@ -220,16 +261,19 @@ class FFmpegService {
         '-maxrate', toKbps(maxVideoBitrate),
         '-bufsize', toKbps(bufferSize),
         '-c:a', 'aac',
-      '-b:a', '192k',
-      '-ar', '48000',
-      '-ac', '2',
-      '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilno?ci z odtwarzaczami mobilnymi
-      '-movflags', '+faststart',
-      '-progress', 'pipe:1',
-      '-nostats',
-      outputName
-    ];
-      await this.ffmpeg.exec(args);
+        '-b:a', '192k',
+        '-ar', '48000',
+        '-ac', '2',
+        '-pix_fmt', 'yuv420p', // Wymagane dla kompatybilnosci z odtwarzaczami mobilnymi
+        '-movflags', '+faststart',
+        '-progress', 'pipe:2',
+        '-stats',
+        outputName
+      ];
+      const exitCode = await this.ffmpeg.exec(args);
+      if (exitCode !== 0) {
+        throw new Error(`FFmpeg zakonczyl sie bledem (kod ${exitCode}).`);
+      }
     } finally {
       this.ffmpeg.off('progress', progressHandler);
       this.ffmpeg.off('log', logHandler);
